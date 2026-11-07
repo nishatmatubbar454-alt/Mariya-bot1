@@ -1,0 +1,69 @@
+{
+  "users": {
+    "8235864550": {
+      "firstName": "𝙀𝐫𝐟ᥲ𝗻 𝘼𝗵𝘮𝗲𝙙 🔥",
+      "firstSeen": "2026-09-24T08:22:14.917Z",
+      "id": 8235864550,
+      "lastActive": "2026-11-07T06:14:44.489Z",
+      "lastName": "",
+      "messageCount": 119,
+      "status": "active",
+      "username": "erfan13234"
+    }
+  },
+  "settings": {
+    "botToken": "enc:v1:e130efc0b5a6f3b820d9d342d1c6d1c9:deb6d56b1beb5c61088c8193e64397c1:99669aaaca118396aeca8c2307ffdbb1fad3f1ad282a772ef76369c45755111ff71ef0dc28ee4edb39151995f15d",
+    "botUsername": "mariya_2Bot",
+    "geminiApiKey": "enc:v1:7133ad9e41941a8af0f3a7d978c0435d:6549a3ed9de35c98ef8e7225d80dd9a5:d56a8b82a54e325a4ade1117c1d12df8b504cf24094493c8f4a718fe1787311a57c61fbfad355c255889653b8094ff63fada1dafe3",
+    "telegramGroupLink": "https://t.me/FlickCove_Top",
+    "whatsappBackupLink": "https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V",
+    "welcomeMessage": "*হ্যালো স্যার*\nএখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের লিং*ক ভি*ডিও পাওয় যায় । ভিডিও দেখতে নিচের বাটনে ক্লিক করে । চ্যানেলের মধ্যে থেকে দেখতে পারেন\n।",
+    "replyMode": "ai",
+    "staticReplyMessage": "এখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের ভিডিও, সুন্দর সুন্দর ভিডিও পাওয়া যায়। নিচের বাটনে ক্লিক করে চ্যানেলে যুক্ত থাকুন।",
+    "commands": {
+      "backupChannelReply": "কখনো ভিডিও মিস না হয় । তাই ব্রেকাপ চ্যানেলে জয়েন করুন। নতুন ভিডিও পান সাথে সাথে",
+      "newVideoReply": "এখানে প্রতিদিন নতুন নতুন টিকটোকারেল লিংক ভিডিও শেয়ার করা হয় । ভিডিও মিস না করতে ব্রেকাপ চ্যানেলে জয়েন করুন 👈",
+      "startReply": "*হ্যালো স্যার*\nএখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের লিং*ক ভি*ডিও পাওয় যায় । ভিডিও দেখতে নিচের বাটনে ক্লিক করে । চ্যানেলের মধ্যে থেকে দেখতে পারেন\n।",
+      "videoHelpReply": "ওয়েবসাইটে মধ্যে কোনো ভিডিও খুঁজে না পেলে ওয়েবসাইটের ওপরে সার্চ ইঞ্জিন আছে, সেখানে সার্চ করলেই ভিডিও পেয়ে যাবেন।"
+    },
+    "aiSystemPrompt": "You are the official conversational AI representative of @mariya_2Bot.\nLanguage: Natural Bengali (বাংলা).\n\nRULES:\n1. If the user asks about videos or what videos are available (ভিডিও সম্পর্কে জানতে চাইলে):\nAlways state:\n\"এখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের ভিডিও, সুন্দর সুন্দর ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের টেলিগ্রাম বা WhatsApp চ্যানেলে যান। সেখানে ১ বা ২টি ওয়েবসাইটের লিংক পাবেন, ওই লিংকে ক্লিক করলেই সব নতুন ভিডিও দেখতে পারবেন।\"\n\n2. If the user says they cannot find a video or asks how/where to search:\nAlways reply:\n\"ওয়েবসাইটের ওপরে সার্চ ইঞ্জিন আছে, সেখানে সার্চ করলেই আশা করি ভিডিও পেয়ে যাবেন।\"\n\n3. For other messages:\nTwo-part reply:\n- Part 1: Address their topic in 1-2 friendly sentences.\n- Part 2: \"আমাদের সব বাংলাদেশী ভিডিও ও চমৎকার টিকটকারের ভিডিও দেখতে নিচের টেলিগ্রাম বা WhatsApp চ্যানেলে যান। সেখানে ১ বা ২টি ওয়েবসাইটের লিংক পাবেন, ওই লিংকে ক্লিক করলেই সব নতুন ভিডিও দেখতে পারবেন।\"",
+    "isPollingActive": true,
+    "broadcastDelaySeconds": 5,
+    "adminTelegramId": "5569819998",
+    "showInlineButtons": true,
+    "channelButtonText": "🎬 সব ভিডিও এখানে (Join)",
+    "whatsappButtonText": "📲 ব্যাকআপ চ্যানেল (WhatsApp)",
+    "messageRequestMode": "instant_reply",
+    "offlineNoticeMessage": "📩 আপনার বার্তাটি 'মেসেজ রিকোয়েস্ট' হিসেবে জমা হয়েছে। বট অনলাইনে আসামাত্রই আপনার বার্তার সঠিক উত্তর দেওয়া হবে। ধন্যবাদ!",
+    "onlineAutoReplyPending": true
+  },
+  "requests": {},
+  "logs": [
+    {
+      "id": "log-1794032167015-nf19m",
+      "timestamp": "2026-11-07T06:16:07.015Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1793948316326-buuvy",
+      "timestamp": "2026-11-06T06:58:36.326Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1793948127924-56j3b",
+      "timestamp": "2026-11-06T06:55:27.924Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "init-1",
+      "timestamp": "2026-11-06T06:55:10.027Z",
+      "type": "system",
+      "message": "Mariya Bot storage initialized for @mariya_2Bot with Firebase mariya-bot"
+    }
+  ],
+  "broadcasts": [],
+  "lastBroadcastNumber": 0
+}
