@@ -14,7 +14,8 @@ import {
   Clock, 
   ArrowRight,
   Database,
-  Radio
+  Radio,
+  Lock
 } from 'lucide-react';
 import { SystemStatus, ActivityLog } from '../types';
 
@@ -244,6 +245,58 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   </a>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* 24/7 Force Channel Verification Gate Card */}
+          <div className="bg-slate-900/80 border border-amber-500/35 rounded-xl p-3.5 sm:p-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                <h3 className="text-xs sm:text-sm font-bold text-white">
+                  ২৪/৭ চ্যানেল ভেরিফাই গেট (Force Join)
+                </h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                  status?.settings?.requireChannelVerify !== false
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}>
+                  {status?.settings?.requireChannelVerify !== false ? 'সক্রিয় (Locked)' : 'বন্ধ'}
+                </span>
+              </div>
+              <button
+                onClick={() => onSwitchTab('settings')}
+                className="text-xs font-medium text-amber-400 hover:text-amber-300 flex items-center gap-1 shrink-0"
+              >
+                কনফিগার <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              ইউজার নিচের চ্যানেলগুলো ভেরিফাই না করলে AI কোনো কথা বলবে না, মিনি অ্যাপে ঢুকতে দিবে না এবং আগের সব মেসেজ স্বয়ংক্রিয়ভাবে ডিলিট হয়ে যাবে।
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {(status?.settings?.verificationChannels && status.settings.verificationChannels.length > 0
+                ? status.settings.verificationChannels
+                : [
+                    { id: '@Click2Cash_Site', title: 'Click2Cash', url: 'https://t.me/Click2Cash_Site' },
+                    { id: '@FlickCove_Top', title: 'FlickCove', url: 'https://t.me/FlickCove_Top' },
+                    { id: '@download_apk_app', title: 'Download.apk', url: 'https://t.me/download_apk_app' }
+                  ]
+              ).map((ch, idx) => (
+                <a
+                  key={idx}
+                  href={ch.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-amber-500/40 flex items-center justify-between gap-2 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-slate-200 truncate">{ch.title}</div>
+                    <div className="text-[11px] text-cyan-400 font-mono truncate">{ch.url}</div>
+                  </div>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+              ))}
             </div>
           </div>
 

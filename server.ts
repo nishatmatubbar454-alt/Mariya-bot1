@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { 
   getSettings, 
@@ -81,7 +82,14 @@ app.get('/api/status', async (_req, res) => {
         replyMode: settings.replyMode,
         isPollingActive: settings.isPollingActive,
         telegramGroupLink: settings.telegramGroupLink,
-        whatsappBackupLink: settings.whatsappBackupLink
+        whatsappBackupLink: settings.whatsappBackupLink,
+        requireChannelVerify: settings.requireChannelVerify !== false,
+        requiredChannelId: settings.requiredChannelId || '@Click2Cash_Site',
+        verificationExpirationHours: typeof settings.verificationExpirationHours === 'number' ? settings.verificationExpirationHours : 24,
+        verificationChannels: settings.verificationChannels || [],
+        autoDeleteOnUnverified: settings.autoDeleteOnUnverified !== false,
+        miniAppUrl: settings.miniAppUrl || '',
+        miniAppButtonText: settings.miniAppButtonText || '🚀 ওপেন মিনি অ্যাপ'
       },
       stats: {
         totalUsers: users.length,
@@ -244,6 +252,110 @@ app.post('/api/webhook/delete', async (_req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+// 4.5 Check Bot Admin Status across Required Verification Channels
+app.get('/api/bot/check-channels', async (_req, res) => {
+  try {
+    const channels = await botEngine.checkAllChannelsBotAccess();
+    const allAccessible = channels.length > 0 && channels.every(c => c.accessible);
+    res.json({ success: true, allAccessible, channels });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4.6 Mini App & External Gate 24/7 Verification Endpoint (Blocks Mini App unless verified)
+async function handleVerifyUserGate(req: express.Request, res: express.Response) {
+  try {
+    const settings = await getSettings();
+    const rawUserId = req.body?.userId || req.query.userId;
+    const initData = String(req.body?.initData || req.query.initData || '').trim();
+    let userId = Number(rawUserId || 0);
+
+    // If Telegram Mini App initData is provided, cryptographically verify & extract user.id
+    if (initData && settings.botToken) {
+      try {
+        const params = new URLSearchParams(initData);
+        const hash = params.get('hash') || '';
+        params.delete('hash');
+        const dataCheckString = Array.from(params.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, v]) => `${k}=${v}`)
+          .join('\n');
+        const secretKey = crypto.createHmac('sha256', 'WebAppData').update(settings.botToken).digest();
+        const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+        if (calculatedHash !== hash) {
+          return res.status(403).json({
+            success: false,
+            verified: false,
+            allowed: false,
+            message: 'অবৈধ টেলিগ্রাম Mini App সেশন! প্রবেশের অনুমতি নেই।'
+          });
+        }
+        const userJson = params.get('user');
+        if (userJson) {
+          const parsedUser = JSON.parse(userJson);
+          if (parsedUser?.id) userId = Number(parsedUser.id);
+        }
+      } catch {
+        return res.status(403).json({
+          success: false,
+          verified: false,
+          allowed: false,
+          message: 'Mini App ভেরিফিকেশন ডাটা সঠিক নয়।'
+        });
+      }
+    }
+
+    if (!userId || isNaN(userId)) {
+      return res.status(403).json({
+        success: false,
+        verified: false,
+        allowed: false,
+        message: 'চ্যানেল ভেরিফিকেশন ছাড়া মিনি অ্যাপে ঢোকা যাবে না!'
+      });
+    }
+
+    const expired = settings.requireChannelVerify !== false
+      ? await botEngine.isVerificationExpired(userId, settings)
+      : false;
+    const verifyCheck = await botEngine.verifyUserChannels(userId, settings);
+    if (!verifyCheck.allVerified || expired) {
+      return res.status(403).json({
+        success: false,
+        verified: false,
+        allowed: false,
+        expired,
+        channels: verifyCheck.results,
+        message: expired
+          ? '⏳ চ্যানেল ভেরিফিকেশনের মেয়াদ শেষ! অনুগ্রহ করে পুনরায় ভেরিফাই করুন।'
+          : '🔒 চ্যানেল ভেরিফাই না করে মিনি অ্যাপ বা বটের কোনো সুবিধা ব্যবহার করা যাবে না!'
+      });
+    }
+
+    return res.json({
+      success: true,
+      verified: true,
+      allowed: true,
+      channels: verifyCheck.results,
+      message: '✅ সব চ্যানেল ভেরিফায়েড!'
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, verified: false, allowed: false, error: err.message });
+  }
+}
+
+app.use('/api/bot/verify-user', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+app.get('/api/bot/verify-user', handleVerifyUserGate);
+app.post('/api/bot/verify-user', handleVerifyUserGate);
 
 
 // 5. Settings CRUD (Protected & Masked - Zero Leakage)
@@ -485,15 +597,34 @@ app.post('/api/broadcast/test-send', async (req, res) => {
 // 8. Bot Simulator (Interactive chat test for admin)
 app.post('/api/simulate-chat', async (req, res) => {
   try {
-    const { message, chatHistory } = req.body;
+    const { message, chatHistory, simulateUnverified } = req.body;
     const settings = await getSettings();
 
+    // Simulate the 24/7 Channel Verification Block + Auto-Delete behavior
+    if (simulateUnverified && settings.requireChannelVerify !== false) {
+      const channels = (settings.verificationChannels && settings.verificationChannels.length > 0)
+        ? settings.verificationChannels
+        : [];
+      const verifyButtons = [
+        ...channels.map(ch => ({ text: '🔒 জয়েন করুন', url: ch.url })),
+        { text: '✅ Verify' }
+      ];
+      return res.json({
+        success: true,
+        reply: (settings.verifyPromptMessage || '').replace(/<[^>]+>/g, ''),
+        mode: 'channel_verify_blocked',
+        clearHistory: settings.autoDeleteOnUnverified !== false,
+        buttons: verifyButtons
+      });
+    }
+
     const buttons: Array<{ text: string; url?: string }> = [];
-    if (settings.showInlineButtons) {
-      buttons.push(
-        { text: settings.channelButtonText || "🎬 সব ভিডিও দেখুন (FlickCove)", url: settings.telegramGroupLink || "https://t.me/FlickCove_Top" },
-        { text: settings.whatsappButtonText || "📲 ব্যাকআপ চ্যানেল (WhatsApp)", url: settings.whatsappBackupLink || "https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V" }
-      );
+    const simMiniAppUrl = (settings.miniAppUrl || 'https://marketify5.markafi189.workers.dev/').trim();
+    if (simMiniAppUrl.startsWith('http')) {
+      buttons.push({
+        text: settings.miniAppButtonText || '🚀 ওপেন মিনি অ্যাপ',
+        url: simMiniAppUrl
+      });
     }
 
     const detected = detectBotCommand(message);

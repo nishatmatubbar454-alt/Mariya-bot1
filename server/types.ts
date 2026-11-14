@@ -5,6 +5,12 @@ export interface ChatMessage {
   timestamp: string; // ISO date string
 }
 
+export interface VerificationChannel {
+  id: string; // e.g. @Click2Cash_Site or -1001234567890
+  title: string; // Button display name
+  url: string; // https://t.me/Click2Cash_Site
+}
+
 export interface BotUser {
   id: number; // Telegram Chat / User ID
   username?: string;
@@ -17,6 +23,9 @@ export interface BotUser {
   lastMessageSnippet?: string;
   lastMessageTimestamp?: string;
   chatHistory?: ChatMessage[];
+  isChannelVerified?: boolean;
+  verifiedAt?: string;
+  trackedMessageIds?: number[];
 }
 
 export interface BotCommandsConfig {
@@ -50,6 +59,16 @@ export interface BotSettings {
   messageRequestMode?: 'auto_queue_when_offline' | 'always_queue' | 'instant_reply';
   offlineNoticeMessage?: string;
   onlineAutoReplyPending?: boolean;
+  // 24/7 Force Channel Verification & Auto-Delete Gate
+  requireChannelVerify?: boolean;
+  requiredChannelId?: string;
+  verificationExpirationHours?: number;
+  verificationChannels?: VerificationChannel[];
+  verifyPromptMessage?: string;
+  verifySuccessMessage?: string;
+  autoDeleteOnUnverified?: boolean;
+  miniAppUrl?: string;
+  miniAppButtonText?: string;
 }
 
 export interface MessageRequest {

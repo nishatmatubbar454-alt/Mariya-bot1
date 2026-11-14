@@ -5,6 +5,12 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface VerificationChannel {
+  id: string;
+  title: string;
+  url: string;
+}
+
 export interface BotUser {
   id: number;
   username?: string;
@@ -17,6 +23,8 @@ export interface BotUser {
   lastMessageSnippet?: string;
   lastMessageTimestamp?: string;
   chatHistory?: ChatMessage[];
+  isChannelVerified?: boolean;
+  verifiedAt?: string;
 }
 
 export interface BotCommandsConfig {
@@ -57,6 +65,15 @@ export interface BotSettings {
   messageRequestMode?: 'auto_queue_when_offline' | 'always_queue' | 'instant_reply';
   offlineNoticeMessage?: string;
   onlineAutoReplyPending?: boolean;
+  requireChannelVerify?: boolean;
+  requiredChannelId?: string;
+  verificationExpirationHours?: number;
+  verificationChannels?: VerificationChannel[];
+  verifyPromptMessage?: string;
+  verifySuccessMessage?: string;
+  autoDeleteOnUnverified?: boolean;
+  miniAppUrl?: string;
+  miniAppButtonText?: string;
 }
 
 export interface MessageRequest {
@@ -166,6 +183,13 @@ export interface SystemStatus {
     messageRequestMode?: 'auto_queue_when_offline' | 'always_queue' | 'instant_reply';
     offlineNoticeMessage?: string;
     onlineAutoReplyPending?: boolean;
+    requireChannelVerify?: boolean;
+    requiredChannelId?: string;
+    verificationExpirationHours?: number;
+    verificationChannels?: VerificationChannel[];
+    autoDeleteOnUnverified?: boolean;
+    miniAppUrl?: string;
+    miniAppButtonText?: string;
   };
   stats: {
     totalUsers: number;

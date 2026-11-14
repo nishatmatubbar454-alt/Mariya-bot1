@@ -3,14 +3,42 @@ dotenv.config();
 
 import fs from 'fs';
 import path from 'path';
-import { BotUser, BotSettings, ActivityLog, BroadcastHistoryItem, MessageRequest, BotCommandsConfig, ChatMessage } from './types.js';
+import { BotUser, BotSettings, ActivityLog, BroadcastHistoryItem, MessageRequest, BotCommandsConfig, ChatMessage, VerificationChannel } from './types.js';
 import { encryptSecret, decryptSecret } from './cryptoService.js';
 
+export const DEFAULT_MINI_APP_URL = "https://marketify5.markafi189.workers.dev/";
+
+export const DEFAULT_VERIFICATION_CHANNELS: VerificationChannel[] = [
+  {
+    id: '@Click2Cash_Site',
+    title: '📢 চ্যানেল ১: Click2Cash',
+    url: 'https://t.me/Click2Cash_Site'
+  },
+  {
+    id: '@FlickCove_Top',
+    title: '🎬 চ্যানেল ২: FlickCove',
+    url: 'https://t.me/FlickCove_Top'
+  },
+  {
+    id: '@download_apk_app',
+    title: '📲 চ্যানেল ৩: Download.apk',
+    url: 'https://t.me/download_apk_app'
+  }
+];
+
+export const DEFAULT_VERIFY_PROMPT = `🔒 <b>বট ব্যবহার করতে আপনাকে চ্যানেলগুলোতে জয়েন করতে হবে।</b>
+
+আপনি চ্যানেলে জয়েন করে নিচের <b>Verify</b> বাটনে চাপুন 👇`;
+
+export const DEFAULT_VERIFY_SUCCESS = `✅ <b>ভেরিফিকেশন সম্পন্ন হয়েছে!</b>
+
+আপনি এখন মিনি অ্যাপ ব্যবহার করতে পারেন 👇`;
+
 export const DEFAULT_COMMANDS: BotCommandsConfig = {
-  startReply: `*হ্যালো স্যার*\nএখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের লিং*ক ভি*ডিও পাওয় যায় । ভিডিও দেখতে নিচের বাটনে ক্লিক করে । চ্যানেলের মধ্যে থেকে দেখতে পারেন\n।`,
-  videoHelpReply: `ওয়েবসাইটে মধ্যে কোনো ভিডিও খুঁজে না পেলে ওয়েবসাইটের ওপরে সার্চ ইঞ্জিন আছে, সেখানে সার্চ করলেই ভিডিও পেয়ে যাবেন।`,
-  newVideoReply: `এখানে প্রতিদিন নতুন নতুন টিকটোকারেল লিংক ভিডিও শেয়ার করা হয় । ভিডিও মিস না করতে ব্রেকাপ চ্যানেলে জয়েন করুন 👈`,
-  backupChannelReply: `কখনো ভিডিও মিস না হয় । তাই ব্রেকাপ চ্যানেলে জয়েন করুন। নতুন ভিডিও পান সাথে সাথে`
+  startReply: `*হ্যালো স্যার*\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇`,
+  videoHelpReply: `আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের ভিডিও পাওয়া যায়। মিনি ওয়েব ওপেন করে ওপরে সার্চ ইঞ্জিনে সার্চ করলেই ভিডিও পেয়ে যাবেন।`,
+  newVideoReply: `আমাদের মিনি ওয়েবের মধ্যে প্রতিদিন নতুন নতুন সব ধরনের ভিডিও ও টিকটকারের ভিডিও শেয়ার করা হয়। এখনই নিচের মিনি ওয়েব বাটনে ক্লিক করে দেখুন 👇`,
+  backupChannelReply: `কখনো ভিডিও মিস না করতে আমাদের মিনি ওয়েব ও ব্যাকআপ চ্যানেলে যুক্ত থাকুন। নিচের মিনি ওয়েব বাটনে ক্লিক করে সব নতুন ভিডিও দেখুন 👇`
 };
 
 import { initializeApp } from "firebase/app";
@@ -50,9 +78,9 @@ const defaultSettings: BotSettings = {
   geminiApiKey: process.env.GEMINI_API_KEY || "enc:v1:7133ad9e41941a8af0f3a7d978c0435d:6549a3ed9de35c98ef8e7225d80dd9a5:d56a8b82a54e325a4ade1117c1d12df8b504cf24094493c8f4a718fe1787311a57c61fbfad355c255889653b8094ff63fada1dafe3",
   telegramGroupLink: "https://t.me/FlickCove_Top",
   whatsappBackupLink: "https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V",
-  welcomeMessage: "*হ্যালো স্যার*\nএখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের লিং*ক ভি*ডিও পাওয় যায় । ভিডিও দেখতে নিচের বাটনে ক্লিক করে । চ্যানেলের মধ্যে থেকে দেখতে পারেন\n।",
+  welcomeMessage: "*হ্যালো স্যার*\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇",
   replyMode: "ai", // 'ai' = Gemini AI, 'static' = Admin fixed reply
-  staticReplyMessage: "এখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের ভিডিও, সুন্দর সুন্দর ভিডিও পাওয়া যায়। নিচের বাটনে ক্লিক করে চ্যানেলে যুক্ত থাকুন।",
+  staticReplyMessage: "আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇",
   commands: DEFAULT_COMMANDS,
   aiSystemPrompt: `You are the official conversational AI representative of @mariya_2Bot.
 Language: Natural Bengali (বাংলা).
@@ -60,25 +88,34 @@ Language: Natural Bengali (বাংলা).
 RULES:
 1. If the user asks about videos or what videos are available (ভিডিও সম্পর্কে জানতে চাইলে):
 Always state:
-"এখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের ভিডিও, সুন্দর সুন্দর ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের টেলিগ্রাম বা WhatsApp চ্যানেলে যান। সেখানে ১ বা ২টি ওয়েবসাইটের লিংক পাবেন, ওই লিংকে ক্লিক করলেই সব নতুন ভিডিও দেখতে পারবেন।"
+"আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ভিডিও ও টিকটকারদের ভিডিও পাওয়া যায়। নিচের মিনি ওয়েব বাটনে ক্লিক করলেই সব ভিডিও সরাসরি দেখতে পারবেন।"
 
 2. If the user says they cannot find a video or asks how/where to search:
 Always reply:
-"ওয়েবসাইটের ওপরে সার্চ ইঞ্জিন আছে, সেখানে সার্চ করলেই আশা করি ভিডিও পেয়ে যাবেন।"
+"আমাদের মিনি ওয়েবের ওপরে সার্চ ইঞ্জিন আছে, মিনি ওয়েব ওপেন করে সেখানে সার্চ করলেই আপনার কাঙ্ক্ষিত ভিডিও পেয়ে যাবেন।"
 
-3. For other messages:
+3. For ALL other messages:
 Two-part reply:
-- Part 1: Address their topic in 1-2 friendly sentences.
-- Part 2: "আমাদের সব বাংলাদেশী ভিডিও ও চমৎকার টিকটকারের ভিডিও দেখতে নিচের টেলিগ্রাম বা WhatsApp চ্যানেলে যান। সেখানে ১ বা ২টি ওয়েবসাইটের লিংক পাবেন, ওই লিংকে ক্লিক করলেই সব নতুন ভিডিও দেখতে পারবেন।"`,
+- Part 1: Address their message politely in 1-2 friendly sentences.
+- Part 2: Always mention that all kinds of videos are available in our Mini Web and invite them to open it using the Mini Web button below ("আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের ভিডিও পাওয়া যায় — নিচের মিনি ওয়েব বাটনে ক্লিক করে সব ভিডিও দেখে নিন।").`,
   isPollingActive: true,
   broadcastDelaySeconds: 5,
   adminTelegramId: "5569819998",
-  showInlineButtons: true,
+  showInlineButtons: false,
   channelButtonText: "🎬 সব ভিডিও এখানে (Join)",
   whatsappButtonText: "📲 ব্যাকআপ চ্যানেল (WhatsApp)",
   messageRequestMode: "instant_reply",
   offlineNoticeMessage: "📩 আপনার বার্তাটি 'মেসেজ রিকোয়েস্ট' হিসেবে জমা হয়েছে। বট অনলাইনে আসামাত্রই আপনার বার্তার সঠিক উত্তর দেওয়া হবে। ধন্যবাদ!",
-  onlineAutoReplyPending: true
+  onlineAutoReplyPending: true,
+  requireChannelVerify: true,
+  requiredChannelId: "@Click2Cash_Site",
+  verificationExpirationHours: 24,
+  verificationChannels: DEFAULT_VERIFICATION_CHANNELS,
+  verifyPromptMessage: DEFAULT_VERIFY_PROMPT,
+  verifySuccessMessage: DEFAULT_VERIFY_SUCCESS,
+  autoDeleteOnUnverified: true,
+  miniAppUrl: DEFAULT_MINI_APP_URL,
+  miniAppButtonText: "🚀 ওপেন মিনি অ্যাপ"
 };
 
 let cachedStore: LocalStorageData | null = null;
@@ -145,6 +182,23 @@ function ensureStorage(): LocalStorageData {
         ...parsed.settings.commands
       };
     }
+    if (parsed.settings.requireChannelVerify === undefined) parsed.settings.requireChannelVerify = true;
+    if (!Array.isArray(parsed.settings.verificationChannels) || parsed.settings.verificationChannels.length === 0) {
+      parsed.settings.verificationChannels = DEFAULT_VERIFICATION_CHANNELS;
+    }
+    if (!parsed.settings.requiredChannelId) {
+      parsed.settings.requiredChannelId = parsed.settings.verificationChannels[0]?.id || '@Click2Cash_Site';
+    }
+    if (typeof parsed.settings.verificationExpirationHours !== 'number' || parsed.settings.verificationExpirationHours < 0) {
+      parsed.settings.verificationExpirationHours = 24;
+    }
+    if (!parsed.settings.verifyPromptMessage) parsed.settings.verifyPromptMessage = DEFAULT_VERIFY_PROMPT;
+    if (!parsed.settings.verifySuccessMessage) parsed.settings.verifySuccessMessage = DEFAULT_VERIFY_SUCCESS;
+    if (parsed.settings.autoDeleteOnUnverified === undefined) parsed.settings.autoDeleteOnUnverified = true;
+    if (!parsed.settings.miniAppUrl || !String(parsed.settings.miniAppUrl).trim()) {
+      parsed.settings.miniAppUrl = DEFAULT_MINI_APP_URL;
+    }
+    if (!parsed.settings.miniAppButtonText) parsed.settings.miniAppButtonText = '🚀 ওপেন মিনি অ্যাপ';
 
     if (!parsed.users) parsed.users = {};
     if (!parsed.requests) parsed.requests = {};
@@ -245,7 +299,9 @@ async function syncUserToFirebase(user: BotUser) {
         firstSeen: user.firstSeen,
         lastActive: user.lastActive,
         messageCount: user.messageCount,
-        status: user.status
+        status: user.status,
+        isChannelVerified: Boolean(user.isChannelVerified),
+        verifiedAt: user.verifiedAt || ''
       }),
       signal: controller.signal
     });
@@ -369,6 +425,7 @@ export async function saveOrUpdateUser(user: Partial<BotUser> & { id: number }):
 
   const now = new Date().toISOString();
   const updatedUser: BotUser = {
+    ...existing,
     id: user.id,
     username: user.username !== undefined ? user.username : (existing?.username || ''),
     firstName: user.firstName !== undefined ? user.firstName : (existing?.firstName || ''),
@@ -376,7 +433,10 @@ export async function saveOrUpdateUser(user: Partial<BotUser> & { id: number }):
     firstSeen: existing?.firstSeen || now,
     lastActive: now,
     messageCount: (existing?.messageCount || 0) + (user.messageCount !== undefined ? user.messageCount : 1),
-    status: user.status || existing?.status || 'active'
+    status: user.status || existing?.status || 'active',
+    isChannelVerified: user.isChannelVerified !== undefined ? user.isChannelVerified : existing?.isChannelVerified,
+    verifiedAt: user.verifiedAt !== undefined ? user.verifiedAt : existing?.verifiedAt,
+    trackedMessageIds: user.trackedMessageIds !== undefined ? user.trackedMessageIds : (existing?.trackedMessageIds || [])
   };
 
   store.users[userIdStr] = updatedUser;
@@ -386,6 +446,56 @@ export async function saveOrUpdateUser(user: Partial<BotUser> & { id: number }):
   syncUserToFirebase(updatedUser).catch(() => {});
 
   return updatedUser;
+}
+
+export async function trackChatMessageId(userId: number, messageId: number): Promise<void> {
+  if (!userId || !messageId) return;
+  const store = ensureStorage();
+  const userIdStr = userId.toString();
+  const user = store.users[userIdStr];
+  if (!user) return;
+  const existingIds = Array.isArray(user.trackedMessageIds) ? user.trackedMessageIds : [];
+  if (!existingIds.includes(messageId)) {
+    existingIds.push(messageId);
+    user.trackedMessageIds = existingIds.slice(-200);
+    writeStorage(store);
+  }
+}
+
+export async function getTrackedChatMessageIds(userId: number): Promise<number[]> {
+  const store = ensureStorage();
+  const user = store.users[userId.toString()];
+  return Array.isArray(user?.trackedMessageIds) ? [...user.trackedMessageIds] : [];
+}
+
+export async function replaceTrackedChatMessageIds(userId: number, messageIds: number[]): Promise<void> {
+  const store = ensureStorage();
+  const user = store.users[userId.toString()];
+  if (!user) return;
+  user.trackedMessageIds = messageIds.slice(-200);
+  writeStorage(store);
+}
+
+export async function updateUserVerification(userId: number, isVerified: boolean): Promise<void> {
+  const store = ensureStorage();
+  const userIdStr = userId.toString();
+  const user = store.users[userIdStr];
+  if (!user) return;
+  user.isChannelVerified = isVerified;
+  if (isVerified) {
+    user.verifiedAt = new Date().toISOString();
+  }
+  writeStorage(store);
+  syncUserToFirebase(user).catch(() => {});
+}
+
+export async function clearUserChatHistory(userId: number): Promise<void> {
+  const store = ensureStorage();
+  const user = store.users[userId.toString()];
+  if (!user) return;
+  user.chatHistory = [];
+  user.lastMessageSnippet = '🔒 চ্যানেল ভেরিফিকেশন পেন্ডিং (মেসেজ ডিলিটেড)';
+  writeStorage(store);
 }
 
 export async function getAllUsers(): Promise<BotUser[]> {

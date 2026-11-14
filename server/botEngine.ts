@@ -4,10 +4,19 @@ import {
   addActivityLog, 
   getUserById,
   appendChatMessage,
-  DEFAULT_COMMANDS
+  trackChatMessageId,
+  getTrackedChatMessageIds,
+  replaceTrackedChatMessageIds,
+  updateUserVerification,
+  clearUserChatHistory,
+  DEFAULT_COMMANDS,
+  DEFAULT_VERIFICATION_CHANNELS,
+  DEFAULT_VERIFY_PROMPT,
+  DEFAULT_VERIFY_SUCCESS,
+  DEFAULT_MINI_APP_URL
 } from "./firebaseService.js";
 import { generateAiReply } from "./geminiService.js";
-import { BotCommandsConfig, BotSettings } from "./types.js";
+import { BotCommandsConfig, BotSettings, VerificationChannel } from "./types.js";
 
 export type BotCommandType = 'start' | 'video_help' | 'new_video' | 'backup_channel' | null;
 
@@ -372,22 +381,396 @@ class TelegramBotEngine {
     }
   }
 
+  public normalizeChannelIdentifier(ch: VerificationChannel): string {
+    const rawId = (ch.id || '').trim();
+    if (rawId.startsWith('-100') || rawId.startsWith('@') || /^-?\d+$/.test(rawId)) {
+      return rawId;
+    }
+    const url = (ch.url || '').trim();
+    const match = url.match(/(?:https?:\/\/)?(?:t\.me|telegram\.me)\/([a-zA-Z0-9_]+)/i);
+    if (match && match[1]) {
+      return `@${match[1]}`;
+    }
+    if (rawId) {
+      return rawId.startsWith('@') ? rawId : `@${rawId}`;
+    }
+    return '';
+  }
+
+  public getEffectiveVerificationChannels(settings: BotSettings): VerificationChannel[] {
+    const baseChannels = (settings.verificationChannels && settings.verificationChannels.length > 0)
+      ? [...settings.verificationChannels]
+      : [...DEFAULT_VERIFICATION_CHANNELS];
+
+    const reqId = (settings.requiredChannelId || '').trim();
+    if (reqId) {
+      const normalizedReq = reqId.startsWith('-100') || reqId.startsWith('@') || /^-?\d+$/.test(reqId)
+        ? reqId
+        : `@${reqId}`;
+      const alreadyExists = baseChannels.some(
+        c => this.normalizeChannelIdentifier(c).toLowerCase() === normalizedReq.toLowerCase()
+      );
+      if (!alreadyExists) {
+        const url = normalizedReq.startsWith('@')
+          ? `https://t.me/${normalizedReq.slice(1)}`
+          : (baseChannels[0]?.url || 'https://t.me/Click2Cash_Site');
+        baseChannels[0] = {
+          id: normalizedReq,
+          title: baseChannels[0]?.title || normalizedReq,
+          url
+        };
+      }
+    }
+    return baseChannels;
+  }
+
+  public async checkAllChannelsBotAccess(): Promise<Array<{
+    channel: VerificationChannel;
+    identifier: string;
+    accessible: boolean;
+    botStatus?: string;
+    chatTitle?: string;
+    error?: string;
+  }>> {
+    const settings = await getSettings();
+    const channels = this.getEffectiveVerificationChannels(settings);
+
+    if (!settings.botToken) {
+      return channels.map(ch => ({
+        channel: ch,
+        identifier: this.normalizeChannelIdentifier(ch),
+        accessible: false,
+        error: 'Bot token missing'
+      }));
+    }
+
+    if (!this.botInfo?.id) {
+      await this.verifyToken(settings.botToken);
+    }
+    const botId = this.botInfo?.id;
+
+    return Promise.all(channels.map(async (ch) => {
+      const identifier = this.normalizeChannelIdentifier(ch);
+      if (!identifier) {
+        return { channel: ch, identifier: '', accessible: false, error: 'Invalid channel ID/URL' };
+      }
+      try {
+        const chatRes = await fetch(
+          `https://api.telegram.org/bot${settings.botToken}/getChat?chat_id=${encodeURIComponent(identifier)}`
+        );
+        const chatData = await chatRes.json();
+        const chatTitle = chatData.ok ? (chatData.result?.title || ch.title) : ch.title;
+
+        if (!botId) {
+          return {
+            channel: ch,
+            identifier,
+            accessible: false,
+            chatTitle,
+            error: 'Bot ID unavailable'
+          };
+        }
+
+        const memberRes = await fetch(
+          `https://api.telegram.org/bot${settings.botToken}/getChatMember?chat_id=${encodeURIComponent(identifier)}&user_id=${botId}`
+        );
+        const memberData = await memberRes.json();
+        if (memberData.ok) {
+          const st = memberData.result?.status || '';
+          const isAdmin = st === 'administrator' || st === 'creator';
+          return {
+            channel: ch,
+            identifier,
+            accessible: isAdmin,
+            botStatus: st,
+            chatTitle,
+            error: isAdmin ? undefined : `বট এডমিন নয় (status: ${st})`
+          };
+        }
+
+        return {
+          channel: ch,
+          identifier,
+          accessible: false,
+          chatTitle,
+          error: memberData.description || 'বটকে চ্যানেলের এডমিন করা হয়নি'
+        };
+      } catch (e: any) {
+        return {
+          channel: ch,
+          identifier,
+          accessible: false,
+          error: e?.message || 'Network error'
+        };
+      }
+    }));
+  }
+
+  public async verifyUserChannels(userId: number, settingsInput?: BotSettings): Promise<{
+    allVerified: boolean;
+    expired?: boolean;
+    results: Array<{
+      channel: VerificationChannel;
+      identifier: string;
+      joined: boolean;
+      status: string;
+      error?: string;
+    }>;
+  }> {
+    const settings = settingsInput || await getSettings();
+    const channels = this.getEffectiveVerificationChannels(settings);
+
+    if (!settings.requireChannelVerify) {
+      return {
+        allVerified: true,
+        results: channels.map(ch => ({
+          channel: ch,
+          identifier: this.normalizeChannelIdentifier(ch),
+          joined: true,
+          status: 'bypassed'
+        }))
+      };
+    }
+
+    if (!settings.botToken || !userId) {
+      return {
+        allVerified: false,
+        results: channels.map(ch => ({
+          channel: ch,
+          identifier: this.normalizeChannelIdentifier(ch),
+          joined: false,
+          status: 'error',
+          error: 'Bot token or userId missing'
+        }))
+      };
+    }
+
+    const results = await Promise.all(channels.map(async (ch) => {
+      const identifier = this.normalizeChannelIdentifier(ch);
+      if (!identifier) {
+        return { channel: ch, identifier: '', joined: false, status: 'invalid_channel', error: 'Invalid channel' };
+      }
+
+      try {
+        const res = await fetch(
+          `https://api.telegram.org/bot${settings.botToken}/getChatMember?chat_id=${encodeURIComponent(identifier)}&user_id=${userId}`
+        );
+        const data = await res.json();
+
+        if (!data.ok) {
+          return {
+            channel: ch,
+            identifier,
+            joined: false,
+            status: 'api_error',
+            error: data.description || 'Verification check failed'
+          };
+        }
+
+        const status = data.result?.status || 'left';
+        const isMember =
+          status === 'creator' ||
+          status === 'administrator' ||
+          status === 'member' ||
+          (status === 'restricted' && data.result?.is_member === true);
+
+        return {
+          channel: ch,
+          identifier,
+          joined: isMember,
+          status
+        };
+      } catch (err: any) {
+        return {
+          channel: ch,
+          identifier,
+          joined: false,
+          status: 'network_error',
+          error: err?.message || 'Network error'
+        };
+      }
+    }));
+
+    const allVerified = results.length > 0 && results.every(r => r.joined);
+    return { allVerified, results };
+  }
+
+  public async isVerificationExpired(userId: number, settings: BotSettings): Promise<boolean> {
+    const hours = typeof settings.verificationExpirationHours === 'number'
+      ? settings.verificationExpirationHours
+      : 24;
+    if (hours <= 0) return false;
+    const user = await getUserById(userId);
+    if (!user || !user.verifiedAt) {
+      return false;
+    }
+    const elapsedMs = Date.now() - new Date(user.verifiedAt).getTime();
+    return elapsedMs >= hours * 3600 * 1000;
+  }
+
+  public async deleteChatMessage(chatId: number | string, messageId: number, token?: string): Promise<boolean> {
+    if (!chatId || !messageId) return false;
+    const botToken = token || (await getSettings()).botToken;
+    if (!botToken) return false;
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId
+        })
+      });
+      const data = await res.json();
+      return Boolean(data.ok);
+    } catch {
+      return false;
+    }
+  }
+
+  public async deleteChatMessagesBatch(chatId: number | string, messageIds: number[]): Promise<number> {
+    if (!messageIds.length) return 0;
+    const settings = await getSettings();
+    const token = settings.botToken;
+    if (!token) return 0;
+
+    const uniqueIds = Array.from(new Set(messageIds.filter(id => typeof id === 'number' && id > 0))).sort((a, b) => b - a);
+    let deletedCount = 0;
+
+    const BATCH_SIZE = 25;
+    for (let i = 0; i < uniqueIds.length; i += BATCH_SIZE) {
+      const batch = uniqueIds.slice(i, i + BATCH_SIZE);
+      const settled = await Promise.allSettled(
+        batch.map(id => this.deleteChatMessage(chatId, id, token))
+      );
+      for (const item of settled) {
+        if (item.status === 'fulfilled' && item.value) {
+          deletedCount++;
+        }
+      }
+    }
+    return deletedCount;
+  }
+
+  public buildVerifyMarkup(
+    settings: BotSettings,
+    results?: Array<{ channel: VerificationChannel; joined: boolean }>
+  ) {
+    const channels = this.getEffectiveVerificationChannels(settings);
+
+    const inlineKeyboard: any[] = [];
+    const joinButtons: any[] = [];
+
+    for (let i = 0; i < channels.length; i++) {
+      const ch = channels[i];
+      const matched = results?.find(r => r.channel.url === ch.url || r.channel.id === ch.id);
+      const prefix = matched ? (matched.joined ? '✅ ' : '🔒 ') : '🔒 ';
+      const url = ch.url || (ch.id.startsWith('@') ? `https://t.me/${ch.id.slice(1)}` : 'https://t.me/Click2Cash_Site');
+
+      joinButtons.push({
+        text: `${prefix}জয়েন করুন`,
+        url
+      });
+    }
+
+    // Place join buttons neatly in 2-column rows for a clean compact Telegram UI
+    for (let i = 0; i < joinButtons.length; i += 2) {
+      inlineKeyboard.push(joinButtons.slice(i, i + 2));
+    }
+
+    inlineKeyboard.push([
+      {
+        text: '✅ Verify',
+        callback_data: 'verify_channels'
+      }
+    ]);
+
+    return { inline_keyboard: inlineKeyboard };
+  }
+
+  private async sendChannelVerifyAndCleanup(
+    chatId: number,
+    userId: number,
+    settings: BotSettings,
+    verifyResult: {
+      allVerified: boolean;
+      results: Array<{ channel: VerificationChannel; identifier: string; joined: boolean; status: string; error?: string }>;
+    },
+    triggerMessageId?: number,
+    existingVerifyMsgId?: number
+  ): Promise<void> {
+    await updateUserVerification(userId, false);
+
+    const promptText = settings.verifyPromptMessage || DEFAULT_VERIFY_PROMPT;
+    const verifyMarkup = this.buildVerifyMarkup(settings, verifyResult.results);
+
+    // 1. Send the Channel Verify message FIRST (as requested: "চ্যানেল ভেরিফাই মেসেজটা আসবে, তারপর বটের মধ্যে যত ধরনের মেসেজ আছে সবগুলো ডিলিট করে দিবে")
+    const sendRes = await this.sendMessage({
+      chat_id: chatId,
+      text: promptText,
+      parse_mode: 'HTML',
+      reply_markup: verifyMarkup,
+      disable_web_page_preview: true,
+      skipTracking: true
+    });
+
+    const newVerifyMsgId = sendRes.ok && sendRes.result?.message_id ? Number(sendRes.result.message_id) : 0;
+
+    // 2. Automatically delete ALL previous messages in the bot chat (keeping ONLY the newly sent Channel Verify message)
+    if (settings.autoDeleteOnUnverified !== false && newVerifyMsgId > 0) {
+      const trackedIds = await getTrackedChatMessageIds(userId);
+      const idsToDelete = new Set<number>(trackedIds);
+
+      if (triggerMessageId && triggerMessageId > 0) {
+        idsToDelete.add(triggerMessageId);
+      }
+      if (existingVerifyMsgId && existingVerifyMsgId > 0) {
+        idsToDelete.add(existingVerifyMsgId);
+      }
+
+      // Sweep recent message IDs before the newly sent verify message to wipe any older bot messages too
+      const sweepStart = Math.max(1, newVerifyMsgId - 150);
+      for (let mid = sweepStart; mid < newVerifyMsgId; mid++) {
+        idsToDelete.add(mid);
+      }
+
+      // Never delete the newly sent verify message itself
+      idsToDelete.delete(newVerifyMsgId);
+
+      const deletedCount = await this.deleteChatMessagesBatch(chatId, Array.from(idsToDelete));
+      await replaceTrackedChatMessageIds(userId, [newVerifyMsgId]);
+      await clearUserChatHistory(userId);
+
+      addActivityLog({
+        type: 'system',
+        userId,
+        message: `🔒 Unverified user #${userId}: Verify message sent & ${deletedCount} bot messages auto-deleted.`
+      }).catch(() => {});
+    } else if (newVerifyMsgId > 0) {
+      await trackChatMessageId(userId, newVerifyMsgId);
+    }
+
+    // Warn admin in activity logs if Telegram returned 'member list is inaccessible'
+    const adminMissingErr = verifyResult.results.find(r => (r.error || '').includes('member list is inaccessible'));
+    if (adminMissingErr) {
+      addActivityLog({
+        type: 'error',
+        userId,
+        message: `⚠️ চ্যানেল "${adminMissingErr.identifier}"-এ বটকে Admin করা হয়নি! ভেরিফিকেশনের জন্য বটকে অবশ্যই চ্যানেলের Admin করতে হবে।`
+      }).catch(() => {});
+    }
+  }
+
   public buildReplyMarkup(settings: BotSettings) {
     const inlineKeyboard: any[] = [];
-    if (settings.showInlineButtons) {
-      // 1. Direct Video Channel link button
-      inlineKeyboard.push([
-        {
-          text: settings.channelButtonText || "🎬 সব ভিডিও দেখুন (FlickCove)",
-          url: settings.telegramGroupLink || "https://t.me/FlickCove_Top"
-        }
-      ]);
 
-      // 2. Direct Backup Channel (WhatsApp) link button
+    // ONLY ONE button below every verified bot message: the Mini App button
+    const miniAppUrl = (settings.miniAppUrl || DEFAULT_MINI_APP_URL).trim();
+    if (miniAppUrl.startsWith('http')) {
       inlineKeyboard.push([
         {
-          text: settings.whatsappButtonText || "📲 ব্রেকাপ চ্যানেল (WhatsApp)",
-          url: settings.whatsappBackupLink || "https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V"
+          text: settings.miniAppButtonText || "🚀 ওপেন মিনি অ্যাপ",
+          web_app: { url: miniAppUrl }
         }
       ]);
     }
@@ -430,11 +813,109 @@ class TelegramBotEngine {
 
   private async handleCallbackQuery(cb: NonNullable<TelegramUpdate['callback_query']>) {
     try {
-      await this.answerCallbackQuery(cb.id);
-
       const chatId = cb.message?.chat.id || cb.from.id;
+      const userId = cb.from.id;
       const data = cb.data || '';
       const settings = await getSettings();
+
+      await saveOrUpdateUser({
+        id: userId,
+        username: cb.from.username,
+        firstName: cb.from.first_name,
+        lastName: cb.from.last_name,
+        status: 'active',
+        messageCount: 0
+      }).catch(() => {});
+
+      // Handle "✅ ভেরিফাই করুন" button click
+      if (data === 'verify_channels') {
+        const verifyCheck = await this.verifyUserChannels(userId, settings);
+
+        if (verifyCheck.allVerified) {
+          await this.answerCallbackQuery(cb.id, '✅ Verify সফল হয়েছে! এখন আপনি বট ব্যবহার করতে পারবেন।', false);
+          await updateUserVerification(userId, true);
+
+          // Remove the verify prompt message cleanly
+          if (cb.message?.message_id) {
+            await this.deleteChatMessage(chatId, cb.message.message_id, settings.botToken);
+          }
+
+          const successText = settings.verifySuccessMessage || DEFAULT_VERIFY_SUCCESS;
+          const replyMarkup = this.buildReplyMarkup(settings);
+          const sent = await this.sendMessage({
+            chat_id: chatId,
+            text: successText,
+            parse_mode: 'HTML',
+            reply_markup: replyMarkup
+          });
+          if (sent.ok && sent.result?.message_id) {
+            await replaceTrackedChatMessageIds(userId, [sent.result.message_id]);
+          }
+
+          addActivityLog({
+            type: 'system',
+            userId,
+            message: `✅ User #${userId} (${cb.from.first_name || 'User'}) passed 24/7 Channel Verification.`
+          }).catch(() => {});
+          return;
+        }
+
+        // Verification failed — tell user which channels are still missing
+        const adminErr = verifyCheck.results.find(r => (r.error || '').includes('member list is inaccessible'));
+        if (adminErr) {
+          await this.answerCallbackQuery(
+            cb.id,
+            `⚠️ বটকে এখনো ${adminErr.identifier} চ্যানেলে Admin করা হয়নি! এডমিনকে জানান।`,
+            true
+          );
+        } else {
+          const missing = verifyCheck.results
+            .filter(r => !r.joined)
+            .map(r => r.channel.title.replace(/^[✅🔒📢🎬📲\s]+/, '').trim() || r.identifier)
+            .join(', ');
+          await this.answerCallbackQuery(
+            cb.id,
+            `❌ আপনি এখনো সব চ্যানেলে জয়েন করেননি!\n\nবাকি আছে: ${missing}\n\nসব চ্যানেলে জয়েন করে আবার চাপুন।`,
+            true
+          );
+        }
+
+        await this.sendChannelVerifyAndCleanup(
+          chatId,
+          userId,
+          settings,
+          verifyCheck,
+          undefined,
+          cb.message?.message_id
+        );
+        return;
+      }
+
+      // 24/7 Channel Verification Gate for ALL other callback queries
+      if (settings.requireChannelVerify !== false) {
+        const expired = await this.isVerificationExpired(userId, settings);
+        const verifyCheck = await this.verifyUserChannels(userId, settings);
+        if (!verifyCheck.allVerified || expired) {
+          await this.answerCallbackQuery(
+            cb.id,
+            expired
+              ? '⏳ আপনার ভেরিফিকেশনের মেয়াদ শেষ হয়েছে! অনুগ্রহ করে পুনরায় ভেরিফাই করুন।'
+              : '🔒 আগে সব চ্যানেল ভেরিফাই করুন! চ্যানেল জয়েন না করে কোনো কিছু ব্যবহার করা যাবে না।',
+            true
+          );
+          await this.sendChannelVerifyAndCleanup(
+            chatId,
+            userId,
+            settings,
+            { ...verifyCheck, allVerified: false },
+            undefined,
+            cb.message?.message_id
+          );
+          return;
+        }
+      }
+
+      await this.answerCallbackQuery(cb.id);
       const replyMarkup = this.buildReplyMarkup(settings);
 
       let replyText = '';
@@ -472,7 +953,7 @@ class TelegramBotEngine {
     }
   }
 
-  public async answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+  public async answerCallbackQuery(callbackQueryId: string, text?: string, showAlert: boolean = false): Promise<void> {
     const settings = await getSettings();
     try {
       await fetch(`https://api.telegram.org/bot${settings.botToken}/answerCallbackQuery`, {
@@ -480,7 +961,8 @@ class TelegramBotEngine {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           callback_query_id: callbackQueryId,
-          text: text || ''
+          text: text || '',
+          show_alert: showAlert
         })
       });
     } catch (e) {}
@@ -494,11 +976,12 @@ class TelegramBotEngine {
     const text = (msg.text || '').trim();
 
     try {
-      // 1. Instantly trigger 'typing' indicator so user knows bot is already responding
-      this.sendChatAction(chatId, 'typing').catch(() => {});
+      // 1. Fast settings retrieval from cache
+      const settings = await getSettings();
+      const adminForwardId = Number(settings.adminTelegramId || '5569819998');
 
-      // 2. Non-blocking user tracking and chat recording
-      saveOrUpdateUser({
+      // 2. Non-blocking user tracking
+      await saveOrUpdateUser({
         id: userId,
         username: msg.from.username,
         firstName: msg.from.first_name,
@@ -506,13 +989,7 @@ class TelegramBotEngine {
         status: 'active'
       }).catch(() => {});
 
-      if (text) {
-        appendChatMessage(userId, 'user', text).catch(() => {});
-      }
-
-      // 3. Fast settings retrieval from cache
-      const settings = await getSettings();
-      const adminForwardId = Number(settings.adminTelegramId || '5569819998');
+      await trackChatMessageId(userId, msg.message_id);
 
       // Admin reply handling: If admin replies to a forwarded message in Telegram, send it back to the original user
       if (adminForwardId && userId === adminForwardId && msg.reply_to_message) {
@@ -523,7 +1000,8 @@ class TelegramBotEngine {
           if (replyText) {
             const sendTarget = await this.sendMessage({
               chat_id: targetUserId,
-              text: replyText
+              text: replyText,
+              reply_markup: this.buildReplyMarkup(settings)
             });
             if (sendTarget.ok) {
               await appendChatMessage(targetUserId, 'admin', replyText);
@@ -538,12 +1016,41 @@ class TelegramBotEngine {
         }
       }
 
-      // Automatically forward incoming user message to Admin Telegram ID (5569819998)
+      // 3. STRICT 24/7 CHANNEL VERIFICATION GATE (Runs FIRST on EVERY message!)
+      // No AI chat, no commands, no Mini App, nothing works unless ALL required channels are verified & within expiration window.
+      if (settings.requireChannelVerify !== false) {
+        const existingUser = await getUserById(userId);
+        const hadVerifiedBefore = Boolean(existingUser?.isChannelVerified && existingUser?.verifiedAt);
+        const expired = await this.isVerificationExpired(userId, settings);
+        const verifyCheck = await this.verifyUserChannels(userId, settings);
+
+        if (!verifyCheck.allVerified || expired) {
+          await this.sendChannelVerifyAndCleanup(
+            chatId,
+            userId,
+            settings,
+            { ...verifyCheck, allVerified: false },
+            msg.message_id
+          );
+          return; // BLOCKED: Do NOT call AI, do NOT run commands, do NOT forward or reply!
+        } else if (!hadVerifiedBefore) {
+          await updateUserVerification(userId, true);
+        }
+      }
+
+      // User is verified — now trigger typing indicator & record message
+      this.sendChatAction(chatId, 'typing').catch(() => {});
+
+      if (text) {
+        appendChatMessage(userId, 'user', text).catch(() => {});
+      }
+
+      // Automatically forward incoming verified user message to Admin Telegram ID
       if (adminForwardId && userId !== adminForwardId) {
         this.forwardUserMessageToAdmin(msg, adminForwardId, settings.botToken).catch(() => {});
       }
 
-      // Build inline buttons with direct channel links and quick action buttons
+      // Build inline buttons with direct channel links and quick action buttons (and Mini App if set)
       const replyMarkup = this.buildReplyMarkup(settings);
 
       // Check if message matches any of the specific bot commands
@@ -588,7 +1095,7 @@ class TelegramBotEngine {
       let replyContent = '';
       if (settings.replyMode === 'static') {
         replyContent = settings.staticReplyMessage || 
-          `ওয়েবসাইটের ওপরে সার্চ ইঞ্জিন আছে, সেখানে সার্চ করলেই আশা করি ভিডিও পেয়ে যাবেন। নিচের বাটনে ক্লিক করে যুক্ত থাকুন।`;
+          `আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇`;
       } else {
         replyContent = await generateAiReply(text, msg.from.first_name);
       }
@@ -634,9 +1141,19 @@ class TelegramBotEngine {
     parse_mode?: string;
     reply_markup?: any;
     disable_web_page_preview?: boolean;
+    skipTracking?: boolean;
   }): Promise<{ ok: boolean; result?: any; error?: string; retryAfter?: number; isBlocked?: boolean }> {
     const settings = await getSettings();
     const token = settings.botToken;
+
+    const recordSentMsg = (result: any) => {
+      if (!params.skipTracking && result?.message_id) {
+        const numericId = typeof params.chat_id === 'number' ? params.chat_id : parseInt(String(params.chat_id), 10);
+        if (!isNaN(numericId) && numericId > 0) {
+          trackChatMessageId(numericId, Number(result.message_id)).catch(() => {});
+        }
+      }
+    };
 
     try {
       const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -653,6 +1170,7 @@ class TelegramBotEngine {
 
       const data = await res.json();
       if (data.ok) {
+        recordSentMsg(data.result);
         return { ok: true, result: data.result };
       } else {
         const desc = data.description || '';
@@ -687,6 +1205,7 @@ class TelegramBotEngine {
             });
             const retryData = await retryRes.json();
             if (retryData.ok) {
+              recordSentMsg(retryData.result);
               return { ok: true, result: retryData.result };
             }
           } catch (retryErr) {}
@@ -706,6 +1225,7 @@ class TelegramBotEngine {
             });
             const finalData = await finalRes.json();
             if (finalData.ok) {
+              recordSentMsg(finalData.result);
               return { ok: true, result: finalData.result };
             }
           } catch (finalErr) {}
@@ -779,6 +1299,12 @@ class TelegramBotEngine {
 
       const data = await res.json();
       if (data.ok) {
+        if (data.result?.message_id) {
+          const numericId = typeof params.chat_id === 'number' ? params.chat_id : parseInt(String(params.chat_id), 10);
+          if (!isNaN(numericId) && numericId > 0) {
+            trackChatMessageId(numericId, Number(data.result.message_id)).catch(() => {});
+          }
+        }
         const photoArr = data.result?.photo;
         const fileId = Array.isArray(photoArr) && photoArr.length > 0
           ? photoArr[photoArr.length - 1].file_id

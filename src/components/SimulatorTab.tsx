@@ -7,7 +7,9 @@ import {
   ExternalLink, 
   RotateCcw, 
   HelpCircle,
-  Cpu
+  Cpu,
+  Lock,
+  ShieldCheck
 } from 'lucide-react';
 import { SystemStatus } from '../types';
 
@@ -28,17 +30,17 @@ export const SimulatorTab: React.FC<SimulatorTabProps> = ({ status }) => {
     {
       id: 'welcome',
       sender: 'bot',
-      text: "*হ্যালো স্যার*\nএখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের লিং*ক ভি*ডিও পাওয় যায় । ভিডিও দেখতে নিচের বাটনে ক্লিক করে । চ্যানেলের মধ্যে থেকে দেখতে পারেন\n।",
+      text: "*হ্যালো স্যার*\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       buttons: [
-        { text: '🎬 সব ভিডিও দেখুন (FlickCove)', url: 'https://t.me/FlickCove_Top' },
-        { text: '📲 ব্যাকআপ চ্যানেল (WhatsApp)', url: 'https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V' }
+        { text: '🚀 ওপেন মিনি অ্যাপ', url: 'https://marketify5.markafi189.workers.dev/' }
       ]
     }
   ]);
 
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [simulateUnverified, setSimulateUnverified] = useState(false);
   const botUsername = status?.bot?.botInfo?.username || status?.settings?.botUsername || 'mariya_2Bot';
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -78,7 +80,8 @@ export const SimulatorTab: React.FC<SimulatorTabProps> = ({ status }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: messageText,
-          chatHistory: history
+          chatHistory: history,
+          simulateUnverified
         })
       });
 
@@ -91,7 +94,12 @@ export const SimulatorTab: React.FC<SimulatorTabProps> = ({ status }) => {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           buttons: data.buttons
         };
-        setMessages((prev) => [...prev, botMsg]);
+        if (data.clearHistory) {
+          // Simulate auto-delete: wipe all previous messages leaving only the verify message
+          setMessages([botMsg]);
+        } else {
+          setMessages((prev) => [...prev, botMsg]);
+        }
       } else {
         const errMsg: ChatMessage = {
           id: `b-${Date.now()}`,
@@ -121,11 +129,10 @@ export const SimulatorTab: React.FC<SimulatorTabProps> = ({ status }) => {
       {
         id: 'welcome',
         sender: 'bot',
-        text: "*হ্যালো স্যার*\nএখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের লিং*ক ভি*ডিও পাওয় যায় । ভিডিও দেখতে নিচের বাটনে ক্লিক করে । চ্যানেলের মধ্যে থেকে দেখতে পারেন\n।",
+        text: "*হ্যালো স্যার*\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         buttons: [
-          { text: '🎬 সব ভিডিও দেখুন (FlickCove)', url: 'https://t.me/FlickCove_Top' },
-          { text: '📲 ব্যাকআপ চ্যানেল (WhatsApp)', url: 'https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V' }
+          { text: '🚀 ওপেন মিনি অ্যাপ', url: 'https://marketify5.markafi189.workers.dev/' }
         ]
       }
     ]);
@@ -163,13 +170,28 @@ export const SimulatorTab: React.FC<SimulatorTabProps> = ({ status }) => {
           </p>
         </div>
 
-        <button
-          onClick={handleReset}
-          className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>চ্যাট ক্লিয়ার করুন</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSimulateUnverified(!simulateUnverified)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-colors ${
+              simulateUnverified
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+            }`}
+          >
+            {simulateUnverified ? <Lock className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+            <span>{simulateUnverified ? 'আন-ভেরিফায়েড টেস্ট (ব্লক + অটো ডিলিট)' : 'ভেরিফায়েড ইউজার মোড'}</span>
+          </button>
+
+          <button
+            onClick={handleReset}
+            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>চ্যাট ক্লিয়ার করুন</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Chat Box Container */}
@@ -219,36 +241,56 @@ export const SimulatorTab: React.FC<SimulatorTabProps> = ({ status }) => {
                 </div>
 
                 {/* Inline Buttons if returned by bot */}
-                {msg.buttons && msg.buttons.length > 0 && (
-                  <div className="space-y-1.5 pt-1">
-                    {msg.buttons.map((btn, bIdx) => {
-                      if (btn.url) {
+                {msg.buttons && msg.buttons.length > 0 && (() => {
+                  const joinButtons = msg.buttons.filter(b => b.url && b.text.includes('জয়েন করুন'));
+                  const otherButtons = msg.buttons.filter(b => !(b.url && b.text.includes('জয়েন করুন')));
+                  return (
+                    <div className="space-y-1.5 pt-1">
+                      {joinButtons.length > 0 && (
+                        <div className={`grid gap-1.5 ${joinButtons.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                          {joinButtons.map((btn, jIdx) => (
+                            <a
+                              key={`j-${jIdx}`}
+                              href={btn.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 shadow-sm transition-all"
+                            >
+                              <span>{btn.text}</span>
+                              <ExternalLink className="w-3 h-3 text-cyan-400" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {otherButtons.map((btn, bIdx) => {
+                        if (btn.url) {
+                          return (
+                            <a
+                              key={bIdx}
+                              href={btn.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 shadow-sm transition-all"
+                            >
+                              <span>{btn.text}</span>
+                              <ExternalLink className="w-3 h-3 text-cyan-400" />
+                            </a>
+                          );
+                        }
                         return (
-                          <a
+                          <button
                             key={bIdx}
-                            href={btn.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700 shadow-sm transition-all"
+                            type="button"
+                            onClick={() => handleSendMessage(btn.action || btn.text)}
+                            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-600/30 to-cyan-600/30 hover:from-emerald-600/40 hover:to-cyan-600/40 text-emerald-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-emerald-500/35 shadow-sm transition-all active:scale-[0.99]"
                           >
                             <span>{btn.text}</span>
-                            <ExternalLink className="w-3 h-3 text-cyan-400" />
-                          </a>
+                          </button>
                         );
-                      }
-                      return (
-                        <button
-                          key={bIdx}
-                          type="button"
-                          onClick={() => handleSendMessage(btn.action || btn.text)}
-                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-slate-800 to-slate-850 hover:from-slate-750 hover:to-slate-700 text-cyan-200 text-xs font-medium flex items-center justify-center gap-1.5 border border-cyan-500/30 shadow-sm transition-all active:scale-[0.99]"
-                        >
-                          <span>{btn.text}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                      })}
+                    </div>
+                  );
+                })()}
 
                 <div className={`text-[10px] text-slate-500 px-1 ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
                   {msg.timestamp}

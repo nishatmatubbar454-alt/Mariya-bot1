@@ -26,9 +26,13 @@ import {
   Globe,
   Zap,
   Activity,
-  Clock
+  Clock,
+  Lock,
+  Plus,
+  Trash2,
+  CheckCircle2
 } from 'lucide-react';
-import { BotSettings, SystemStatus, DEFAULT_COMMANDS } from '../types';
+import { BotSettings, SystemStatus, DEFAULT_COMMANDS, VerificationChannel } from '../types';
 
 interface SettingsTabProps {
   status: SystemStatus | null;
@@ -60,9 +64,22 @@ Always reply:
     isPollingActive: true,
     broadcastDelaySeconds: 5,
     adminTelegramId: "5569819998",
-    showInlineButtons: true,
+    showInlineButtons: false,
     channelButtonText: "🎬 সব ভিডিও দেখুন (FlickCove)",
-    whatsappButtonText: "📲 ব্যাকআপ চ্যানেল (WhatsApp)"
+    whatsappButtonText: "📲 ব্যাকআপ চ্যানেল (WhatsApp)",
+    requireChannelVerify: true,
+    requiredChannelId: '@Click2Cash_Site',
+    verificationExpirationHours: 24,
+    verificationChannels: [
+      { id: '@Click2Cash_Site', title: '📢 চ্যানেল ১: Click2Cash', url: 'https://t.me/Click2Cash_Site' },
+      { id: '@FlickCove_Top', title: '🎬 চ্যানেল ২: FlickCove', url: 'https://t.me/FlickCove_Top' },
+      { id: '@download_apk_app', title: '📲 চ্যানেল ৩: Download.apk', url: 'https://t.me/download_apk_app' }
+    ],
+    verifyPromptMessage: '',
+    verifySuccessMessage: '',
+    autoDeleteOnUnverified: true,
+    miniAppUrl: 'https://marketify5.markafi189.workers.dev/',
+    miniAppButtonText: '🚀 ওপেন মিনি অ্যাপ'
   });
 
   const [showToken, setShowToken] = useState(false);
@@ -80,6 +97,29 @@ Always reply:
   const [githubBranch, setGithubBranch] = useState('main');
   const [isPushingGithub, setIsPushingGithub] = useState(false);
   const [githubPushResult, setGithubPushResult] = useState<{ ok: boolean; msg: string; repoUrl?: string } | null>(null);
+
+  // Channel Verification Live Check State
+  const [checkingChannels, setCheckingChannels] = useState(false);
+  const [channelAccessReport, setChannelAccessReport] = useState<Array<{
+    channel: VerificationChannel;
+    identifier: string;
+    accessible: boolean;
+    botStatus?: string;
+    chatTitle?: string;
+    error?: string;
+  }> | null>(null);
+
+  const handleCheckChannelsAccess = async () => {
+    setCheckingChannels(true);
+    try {
+      const res = await fetch('/api/bot/check-channels');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.channels)) {
+        setChannelAccessReport(data.channels);
+      }
+    } catch {}
+    setCheckingChannels(false);
+  };
 
   const handlePushToGithub = async () => {
     if (!githubRepoUrl.trim() || !githubToken.trim()) {
@@ -589,6 +629,298 @@ Always reply:
                 type="text"
                 value={formData.whatsappButtonText}
                 onChange={(e) => setFormData({ ...formData, whatsappButtonText: e.target.value })}
+                className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3.5: Channel Verification */}
+        <div className="bg-slate-900/80 border border-amber-500/35 rounded-2xl p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div>
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <Lock className="w-4 h-4 text-amber-400" />
+                <span>Channel Verification (চ্যানেল ভেরিফিকেশন গেট)</span>
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                চ্যানেল জয়েন না করলে AI কোনো কথা বলবে না, মিনি অ্যাপে ঢুকতে দিবে না এবং ভেরিফাই মেসেজ আসলে আগের সব মেসেজ স্বয়ংক্রিয়ভাবে ডিলিট হয়ে যাবে।
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCheckChannelsAccess}
+              disabled={checkingChannels}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-all disabled:opacity-50"
+            >
+              {checkingChannels ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+              <span>বট এডমিন স্ট্যাটাস চেক</span>
+            </button>
+          </div>
+
+          {/* Primary Required Telegram Channel ID & Verification Expiration Duration */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Required Telegram Channel ID (মূল চ্যানেল আইডি / ইউজারনেম)
+              </label>
+              <input
+                type="text"
+                value={formData.requiredChannelId ?? (formData.verificationChannels?.[0]?.id || '@Click2Cash_Site')}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const list = [...(formData.verificationChannels || [])];
+                  if (list.length > 0) {
+                    const cleanVal = val.trim();
+                    const inferredUrl = cleanVal.startsWith('@')
+                      ? `https://t.me/${cleanVal.slice(1)}`
+                      : list[0].url;
+                    list[0] = { ...list[0], id: val, url: cleanVal.startsWith('@') ? inferredUrl : list[0].url };
+                  }
+                  setFormData({ ...formData, requiredChannelId: val, verificationChannels: list });
+                }}
+                placeholder="@Click2Cash_Site অথবা -1002340560600"
+                className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                পাবলিক চ্যানেলের জন্য <code className="text-amber-300">@username</code> অথবা প্রাইভেট চ্যানেলের জন্য <code className="text-amber-300">-100...</code> আইডি দিন।
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  Verification Expiration Duration (ঘণ্টা)
+                </span>
+                <span className="text-[10px] font-mono text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                  {Number(formData.verificationExpirationHours ?? 24) === 0
+                    ? 'Every Message (Live)'
+                    : `${formData.verificationExpirationHours ?? 24}h`}
+                </span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={720}
+                  value={formData.verificationExpirationHours ?? 24}
+                  onChange={(e) => {
+                    const parsed = Math.max(0, parseInt(e.target.value || '0', 10) || 0);
+                    setFormData({ ...formData, verificationExpirationHours: parsed });
+                  }}
+                  className="w-28 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {[12, 24, 48, 72].map((hr) => (
+                    <button
+                      key={hr}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, verificationExpirationHours: hr })}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-semibold border transition-colors ${
+                        (formData.verificationExpirationHours ?? 24) === hr
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {hr}h
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                ডিফল্ট ২৪ ঘণ্টা (24h)। মেয়াদ শেষে বা চ্যানেল লিভ করলে পুনরায় ভেরিফাই করতে হবে।
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 cursor-pointer">
+              <div>
+                <div className="text-xs font-bold text-white">২৪/৭ চ্যানেল ভেরিফাই বাধ্যতামূলক</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">জয়েন না থাকলে AI ও কমান্ড ব্লক থাকবে</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.requireChannelVerify !== false}
+                onChange={(e) => setFormData({ ...formData, requireChannelVerify: e.target.checked })}
+                className="w-4 h-4 accent-amber-500 rounded"
+              />
+            </label>
+
+            <label className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 cursor-pointer">
+              <div>
+                <div className="text-xs font-bold text-white">Automatic Message Cleanup Policy</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">ভেরিফাই মেসেজ আসলে বটের পূর্বের সব মেসেজ স্বয়ংক্রিয়ভাবে ডিলিট</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.autoDeleteOnUnverified !== false}
+                onChange={(e) => setFormData({ ...formData, autoDeleteOnUnverified: e.target.checked })}
+                className="w-4 h-4 accent-amber-500 rounded"
+              />
+            </label>
+          </div>
+
+          {/* Live Bot Admin Status Check Report */}
+          {channelAccessReport && (
+            <div className="space-y-2 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+              <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-cyan-400" />
+                <span>চ্যানেল এডমিন স্ট্যাটাস রিপোর্ট:</span>
+              </div>
+              {channelAccessReport.map((rep, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between gap-2 p-2.5 rounded-lg border text-xs ${
+                    rep.accessible
+                      ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+                      : 'bg-rose-500/10 border-rose-500/25 text-rose-300'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold truncate">{rep.chatTitle || rep.channel.title} ({rep.identifier})</div>
+                    {!rep.accessible && (
+                      <div className="text-[11px] text-rose-200/80 mt-0.5">
+                        ⚠️ বটকে এই চ্যানেলে Administrator হিসেবে অ্যাড করতে হবে ({rep.error || 'Admin access needed'})
+                      </div>
+                    )}
+                  </div>
+                  <span className="shrink-0 font-bold text-[11px] px-2 py-0.5 rounded bg-slate-950/60">
+                    {rep.accessible ? '✅ Admin Ready' : '❌ Not Admin'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Required Channels List */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-slate-300">
+                ভেরিফিকেশনের জন্য বাধ্যতামূলক চ্যানেলসমূহ
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  const list = [...(formData.verificationChannels || [])];
+                  list.push({ id: '@', title: `📢 চ্যানেল ${list.length + 1}`, url: 'https://t.me/' });
+                  setFormData({ ...formData, verificationChannels: list });
+                }}
+                className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> চ্যানেল যোগ করুন
+              </button>
+            </div>
+
+            {(formData.verificationChannels || []).map((ch, idx) => (
+              <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-3 rounded-xl bg-slate-950/60 border border-slate-800 items-center">
+                <div className="sm:col-span-3">
+                  <label className="block text-[10px] text-slate-400 mb-1">চ্যানেল ইউজারনেম / আইডি</label>
+                  <input
+                    type="text"
+                    value={ch.id}
+                    onChange={(e) => {
+                      const list = [...(formData.verificationChannels || [])];
+                      list[idx] = { ...list[idx], id: e.target.value };
+                      setFormData({ ...formData, verificationChannels: list });
+                    }}
+                    placeholder="@Click2Cash_Site"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <label className="block text-[10px] text-slate-400 mb-1">বাটনের নাম</label>
+                  <input
+                    type="text"
+                    value={ch.title}
+                    onChange={(e) => {
+                      const list = [...(formData.verificationChannels || [])];
+                      list[idx] = { ...list[idx], title: e.target.value };
+                      setFormData({ ...formData, verificationChannels: list });
+                    }}
+                    placeholder="চ্যানেল ১: Click2Cash"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200"
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <label className="block text-[10px] text-slate-400 mb-1">চ্যানেল লিংক (URL)</label>
+                  <input
+                    type="url"
+                    value={ch.url}
+                    onChange={(e) => {
+                      const list = [...(formData.verificationChannels || [])];
+                      list[idx] = { ...list[idx], url: e.target.value };
+                      setFormData({ ...formData, verificationChannels: list });
+                    }}
+                    placeholder="https://t.me/Click2Cash_Site"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 font-mono"
+                  />
+                </div>
+                <div className="sm:col-span-1 flex justify-end pt-4 sm:pt-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const list = (formData.verificationChannels || []).filter((_, i) => i !== idx);
+                      setFormData({ ...formData, verificationChannels: list });
+                    }}
+                    className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10"
+                    title="মুছুন"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                ভেরিফাই মেসেজ (চ্যানেল জয়েন না থাকলে যা দেখাবে)
+              </label>
+              <textarea
+                rows={4}
+                value={formData.verifyPromptMessage || ''}
+                onChange={(e) => setFormData({ ...formData, verifyPromptMessage: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 leading-relaxed focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                ভেরিফিকেশন সফল মেসেজ (ভেরিফাই হলে যা দেখাবে)
+              </label>
+              <textarea
+                rows={4}
+                value={formData.verifySuccessMessage || ''}
+                onChange={(e) => setFormData({ ...formData, verifySuccessMessage: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 leading-relaxed focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          {/* Optional Mini App URL (Locked until Channel Verified) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                মিনি অ্যাপ লিংক (Mini App URL — শুধুমাত্র ভেরিফাই হলে দেখাবে)
+              </label>
+              <input
+                type="url"
+                value={formData.miniAppUrl || ''}
+                onChange={(e) => setFormData({ ...formData, miniAppUrl: e.target.value })}
+                placeholder="https://your-mini-app-url.com (ঐচ্ছিক)"
+                className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200 font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-400 mb-1">মিনি অ্যাপ বাটন টেক্সট</label>
+              <input
+                type="text"
+                value={formData.miniAppButtonText || ''}
+                onChange={(e) => setFormData({ ...formData, miniAppButtonText: e.target.value })}
+                placeholder="🚀 ওপেন মিনি অ্যাপ"
                 className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-200"
               />
             </div>

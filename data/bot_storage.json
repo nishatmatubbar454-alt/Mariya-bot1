@@ -4,11 +4,33 @@
       "firstName": "𝙀𝐫𝐟ᥲ𝗻 𝘼𝗵𝘮𝗲𝙙 🔥",
       "firstSeen": "2026-09-24T08:22:14.917Z",
       "id": 8235864550,
-      "lastActive": "2026-11-07T06:14:44.489Z",
+      "lastActive": "2026-11-07T08:36:50.565Z",
       "lastName": "",
-      "messageCount": 119,
+      "messageCount": 130,
       "status": "active",
       "username": "erfan13234"
+    },
+    "5569819998": {
+      "firstName": "𝗡༏Ꭶ𝓱𝒶т 𝘽𝙪𝙮𝙧 🔕",
+      "firstSeen": "2026-11-07T06:41:16.214Z",
+      "id": 5569819998,
+      "lastActive": "2026-11-14T07:08:22.844Z",
+      "lastName": "",
+      "messageCount": 41,
+      "status": "active",
+      "username": "Nishat13234",
+      "isChannelVerified": false,
+      "verifiedAt": "2026-11-14T06:59:20.030Z"
+    },
+    "8888773188": {
+      "firstName": "Sayed",
+      "firstSeen": "2026-11-13T21:41:26.034Z",
+      "id": 8888773188,
+      "lastActive": "2026-11-13T21:41:26.759Z",
+      "lastName": "MB",
+      "messageCount": 2,
+      "status": "active",
+      "username": ""
     }
   },
   "settings": {
@@ -17,31 +39,134 @@
     "geminiApiKey": "enc:v1:7133ad9e41941a8af0f3a7d978c0435d:6549a3ed9de35c98ef8e7225d80dd9a5:d56a8b82a54e325a4ade1117c1d12df8b504cf24094493c8f4a718fe1787311a57c61fbfad355c255889653b8094ff63fada1dafe3",
     "telegramGroupLink": "https://t.me/FlickCove_Top",
     "whatsappBackupLink": "https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V",
-    "welcomeMessage": "*হ্যালো স্যার*\nএখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের লিং*ক ভি*ডিও পাওয় যায় । ভিডিও দেখতে নিচের বাটনে ক্লিক করে । চ্যানেলের মধ্যে থেকে দেখতে পারেন\n।",
+    "welcomeMessage": "*হ্যালো স্যার*\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇",
     "replyMode": "ai",
-    "staticReplyMessage": "এখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের ভিডিও, সুন্দর সুন্দর ভিডিও পাওয়া যায়। নিচের বাটনে ক্লিক করে চ্যানেলে যুক্ত থাকুন।",
+    "staticReplyMessage": "আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇",
     "commands": {
-      "backupChannelReply": "কখনো ভিডিও মিস না হয় । তাই ব্রেকাপ চ্যানেলে জয়েন করুন। নতুন ভিডিও পান সাথে সাথে",
-      "newVideoReply": "এখানে প্রতিদিন নতুন নতুন টিকটোকারেল লিংক ভিডিও শেয়ার করা হয় । ভিডিও মিস না করতে ব্রেকাপ চ্যানেলে জয়েন করুন 👈",
-      "startReply": "*হ্যালো স্যার*\nএখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের লিং*ক ভি*ডিও পাওয় যায় । ভিডিও দেখতে নিচের বাটনে ক্লিক করে । চ্যানেলের মধ্যে থেকে দেখতে পারেন\n।",
-      "videoHelpReply": "ওয়েবসাইটে মধ্যে কোনো ভিডিও খুঁজে না পেলে ওয়েবসাইটের ওপরে সার্চ ইঞ্জিন আছে, সেখানে সার্চ করলেই ভিডিও পেয়ে যাবেন।"
+      "backupChannelReply": "কখনো ভিডিও মিস না করতে আমাদের মিনি ওয়েব ও ব্যাকআপ চ্যানেলে যুক্ত থাকুন। নিচের মিনি ওয়েব বাটনে ক্লিক করে সব নতুন ভিডিও দেখুন 👇",
+      "newVideoReply": "আমাদের মিনি ওয়েবের মধ্যে প্রতিদিন নতুন নতুন সব ধরনের ভিডিও ও টিকটকারের ভিডিও শেয়ার করা হয়। এখনই নিচের মিনি ওয়েব বাটনে ক্লিক করে দেখুন 👇",
+      "startReply": "*হ্যালো স্যার*\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারদের ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇",
+      "videoHelpReply": "আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের ভিডিও পাওয়া যায়। মিনি ওয়েব ওপেন করে ওপরে সার্চ ইঞ্জিনে সার্চ করলেই ভিডিও পেয়ে যাবেন।"
     },
-    "aiSystemPrompt": "You are the official conversational AI representative of @mariya_2Bot.\nLanguage: Natural Bengali (বাংলা).\n\nRULES:\n1. If the user asks about videos or what videos are available (ভিডিও সম্পর্কে জানতে চাইলে):\nAlways state:\n\"এখানে সব বাংলাদেশী ভিডিও পাওয়া যায়। বিভিন্ন ধরনের টিকটকারের ভিডিও, সুন্দর সুন্দর ভিডিও পাওয়া যায়। ভিডিও দেখতে নিচের টেলিগ্রাম বা WhatsApp চ্যানেলে যান। সেখানে ১ বা ২টি ওয়েবসাইটের লিংক পাবেন, ওই লিংকে ক্লিক করলেই সব নতুন ভিডিও দেখতে পারবেন।\"\n\n2. If the user says they cannot find a video or asks how/where to search:\nAlways reply:\n\"ওয়েবসাইটের ওপরে সার্চ ইঞ্জিন আছে, সেখানে সার্চ করলেই আশা করি ভিডিও পেয়ে যাবেন।\"\n\n3. For other messages:\nTwo-part reply:\n- Part 1: Address their topic in 1-2 friendly sentences.\n- Part 2: \"আমাদের সব বাংলাদেশী ভিডিও ও চমৎকার টিকটকারের ভিডিও দেখতে নিচের টেলিগ্রাম বা WhatsApp চ্যানেলে যান। সেখানে ১ বা ২টি ওয়েবসাইটের লিংক পাবেন, ওই লিংকে ক্লিক করলেই সব নতুন ভিডিও দেখতে পারবেন।\"",
+    "aiSystemPrompt": "You are the official conversational AI representative of @mariya_2Bot.\nLanguage: Natural Bengali (বাংলা).\n\nRULES:\n1. If the user asks about videos or what videos are available (ভিডিও সম্পর্কে জানতে চাইলে):\nAlways state:\n\"আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ভিডিও ও টিকটকারদের ভিডিও পাওয়া যায়। নিচের মিনি ওয়েব বাটনে ক্লিক করলেই সব ভিডিও সরাসরি দেখতে পারবেন।\"\n\n2. If the user says they cannot find a video or asks how/where to search:\nAlways reply:\n\"আমাদের মিনি ওয়েবের ওপরে সার্চ ইঞ্জিন আছে, মিনি ওয়েব ওপেন করে সেখানে সার্চ করলেই আপনার কাঙ্ক্ষিত ভিডিও পেয়ে যাবেন।\"\n\n3. For ALL other messages:\nTwo-part reply:\n- Part 1: Address their message politely in 1-2 friendly sentences.\n- Part 2: Always mention that all kinds of videos are available in our Mini Web and invite them to open it using the Mini Web button below (\"আমাদের মিনি ওয়েবের মধ্যে সকল ধরনের ভিডিও পাওয়া যায় — নিচের মিনি ওয়েব বাটনে ক্লিক করে সব ভিডিও দেখে নিন।\").",
     "isPollingActive": true,
     "broadcastDelaySeconds": 5,
     "adminTelegramId": "5569819998",
-    "showInlineButtons": true,
+    "showInlineButtons": false,
     "channelButtonText": "🎬 সব ভিডিও এখানে (Join)",
     "whatsappButtonText": "📲 ব্যাকআপ চ্যানেল (WhatsApp)",
     "messageRequestMode": "instant_reply",
     "offlineNoticeMessage": "📩 আপনার বার্তাটি 'মেসেজ রিকোয়েস্ট' হিসেবে জমা হয়েছে। বট অনলাইনে আসামাত্রই আপনার বার্তার সঠিক উত্তর দেওয়া হবে। ধন্যবাদ!",
-    "onlineAutoReplyPending": true
+    "onlineAutoReplyPending": true,
+    "requireChannelVerify": true,
+    "verificationChannels": [
+      {
+        "id": "@Click2Cash_Site",
+        "title": "📢 চ্যানেল ১: Click2Cash",
+        "url": "https://t.me/Click2Cash_Site"
+      },
+      {
+        "id": "@FlickCove_Top",
+        "title": "🎬 চ্যানেল ২: FlickCove",
+        "url": "https://t.me/FlickCove_Top"
+      },
+      {
+        "id": "@download_apk_app",
+        "title": "📲 চ্যানেল ৩: Download.apk",
+        "url": "https://t.me/download_apk_app"
+      }
+    ],
+    "verifyPromptMessage": "🔒 <b>বট ব্যবহার করতে আপনাকে চ্যানেলগুলোতে জয়েন করতে হবে।</b>\n\nআপনি চ্যানেলে জয়েন করে নিচের <b>Verify</b> বাটনে চাপুন 👇",
+    "verifySuccessMessage": "✅ <b>ভেরিফিকেশন সম্পন্ন হয়েছে!</b>\n\nআপনি এখন মিনি অ্যাপ ব্যবহার করতে পারেন 👇",
+    "autoDeleteOnUnverified": true,
+    "miniAppUrl": "https://marketify5.markafi189.workers.dev/",
+    "miniAppButtonText": "🚀 ওপেন মিনি অ্যাপ",
+    "requiredChannelId": "@Click2Cash_Site",
+    "verificationExpirationHours": 24
   },
   "requests": {},
   "logs": [
     {
-      "id": "log-1794032167015-nf19m",
-      "timestamp": "2026-11-07T06:16:07.015Z",
+      "id": "log-1794640267881-qjigv",
+      "timestamp": "2026-11-14T07:11:07.881Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794639886570-pk9qm",
+      "timestamp": "2026-11-14T07:04:46.570Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794639796197-qslez",
+      "timestamp": "2026-11-14T07:03:16.197Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794639518992-22bon",
+      "timestamp": "2026-11-14T06:58:38.992Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794639456846-lgabh",
+      "timestamp": "2026-11-14T06:57:36.846Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794638852432-6oxl1",
+      "timestamp": "2026-11-14T06:47:32.432Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794638720166-9j10d",
+      "timestamp": "2026-11-14T06:45:20.166Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794638549649-c37u8",
+      "timestamp": "2026-11-14T06:42:29.649Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794638503412-vgfu0",
+      "timestamp": "2026-11-14T06:41:43.412Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794637351605-b5dlw",
+      "timestamp": "2026-11-14T06:22:31.606Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794637253964-82m4p",
+      "timestamp": "2026-11-14T06:20:53.964Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794635248147-k5hbn",
+      "timestamp": "2026-11-14T05:47:28.147Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794635091301-gjsf3",
+      "timestamp": "2026-11-14T05:44:51.301Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794634502979-qpakh",
+      "timestamp": "2026-11-14T05:35:02.979Z",
       "type": "system",
       "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
     },

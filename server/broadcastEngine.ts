@@ -161,33 +161,21 @@ class BroadcastEngine {
   ) {
     const settings = await getSettings();
 
-    // Prepare inline buttons
-    const inlineKeyboard: any[] = [];
-    if (payload.includeButtons) {
-      inlineKeyboard.push([
-        {
-          text: settings.channelButtonText || "🎬 সব ভিডিও দেখুন (FlickCove)",
-          url: settings.telegramGroupLink || "https://t.me/FlickCove_Top"
+    // Prepare inline buttons (Only single Mini App button for verified users)
+    const miniAppUrl = (settings.miniAppUrl || 'https://marketify5.markafi189.workers.dev/').trim();
+    const replyMarkup = undefined;
+    const verifiedReplyMarkup = miniAppUrl.startsWith('http')
+      ? {
+          inline_keyboard: [
+            [
+              {
+                text: settings.miniAppButtonText || "🚀 ওপেন মিনি অ্যাপ",
+                web_app: { url: miniAppUrl }
+              }
+            ]
+          ]
         }
-      ]);
-      inlineKeyboard.push([
-        {
-          text: settings.whatsappButtonText || "📲 ব্যাকআপ চ্যানেল (WhatsApp)",
-          url: settings.whatsappBackupLink || "https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V"
-        }
-      ]);
-    }
-
-    if (payload.customButtonText && payload.customButtonUrl) {
-      inlineKeyboard.push([
-        {
-          text: payload.customButtonText,
-          url: payload.customButtonUrl
-        }
-      ]);
-    }
-
-    const replyMarkup = inlineKeyboard.length > 0 ? { inline_keyboard: inlineKeyboard } : undefined;
+      : undefined;
 
     // Split target users into small batches
     const batches: any[][] = [];
@@ -241,6 +229,10 @@ class BroadcastEngine {
 
         let sendResult: { ok: boolean; error?: string; retryAfter?: number };
 
+        const userMarkup = (settings.requireChannelVerify === false || user.isChannelVerified)
+          ? verifiedReplyMarkup
+          : replyMarkup;
+
         try {
           if (hasPhoto) {
             const photoToSend = cachedTelegramFileId || payload.imageUrl!.trim();
@@ -249,7 +241,7 @@ class BroadcastEngine {
               photo: photoToSend,
               caption: fullMessage,
               parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-              reply_markup: replyMarkup
+              reply_markup: userMarkup
             });
             sendResult = photoRes;
             if (photoRes.ok && photoRes.fileId && !cachedTelegramFileId) {
@@ -260,7 +252,7 @@ class BroadcastEngine {
               chat_id: user.id,
               text: fullMessage,
               parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-              reply_markup: replyMarkup
+              reply_markup: userMarkup
             });
           }
         } catch (netErr: any) {
@@ -282,7 +274,7 @@ class BroadcastEngine {
                 photo: photoToSend,
                 caption: fullMessage,
                 parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-                reply_markup: replyMarkup
+                reply_markup: userMarkup
               });
               sendResult = photoRes;
               if (photoRes.ok && photoRes.fileId && !cachedTelegramFileId) {
@@ -293,7 +285,7 @@ class BroadcastEngine {
                 chat_id: user.id,
                 text: fullMessage,
                 parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-                reply_markup: replyMarkup
+                reply_markup: userMarkup
               });
             }
           } catch (retryErr: any) {
@@ -406,26 +398,12 @@ class BroadcastEngine {
     const settings = await getSettings();
 
     const inlineKeyboard: any[] = [];
-    if (payload.includeButtons) {
+    const miniAppUrl = (settings.miniAppUrl || 'https://marketify5.markafi189.workers.dev/').trim();
+    if (miniAppUrl.startsWith('http')) {
       inlineKeyboard.push([
         {
-          text: settings.channelButtonText || "🎬 সব ভিডিও দেখুন (FlickCove)",
-          url: settings.telegramGroupLink || "https://t.me/FlickCove_Top"
-        }
-      ]);
-      inlineKeyboard.push([
-        {
-          text: settings.whatsappButtonText || "📲 ব্যাকআপ চ্যানেল (WhatsApp)",
-          url: settings.whatsappBackupLink || "https://whatsapp.com/channel/0029Vb7fVTzDzgT78gexpV3V"
-        }
-      ]);
-    }
-
-    if (payload.customButtonText && payload.customButtonUrl) {
-      inlineKeyboard.push([
-        {
-          text: payload.customButtonText,
-          url: payload.customButtonUrl
+          text: settings.miniAppButtonText || "🚀 ওপেন মিনি অ্যাপ",
+          web_app: { url: miniAppUrl }
         }
       ]);
     }
