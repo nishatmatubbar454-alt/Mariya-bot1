@@ -83,7 +83,7 @@ class BroadcastEngine {
       title: payload.title,
       message: payload.message,
       status: 'running',
-      totalUsers: allUsers.length,
+      totalUsers: nonBlockedUsers.length,
       sentCount: resumeFromId === this.currentProgress.id ? this.currentProgress.sentCount : 0,
       failedCount: resumeFromId === this.currentProgress.id ? this.currentProgress.failedCount : 0,
       blockedCount: resumeFromId === this.currentProgress.id ? this.currentProgress.blockedCount : 0,
@@ -112,7 +112,7 @@ class BroadcastEngine {
 
     await addActivityLog({
       type: 'broadcast',
-      message: `📢 Broadcast #${broadcastNum} শুরু হয়েছে: মোট ${this.currentProgress.totalUsers} জন ইউজার (Batch: ${batchSize}, Delay: ${delaySeconds}s)।`
+      message: `📢 Broadcast #${broadcastNum} শুরু হয়েছে: মোট ${nonBlockedUsers.length} জন সক্রিয় ইউজার (চ্যানেল জয়েন ও নন-জয়েন সকল /start ইউজার, Batch: ${batchSize}, Delay: ${delaySeconds}s)।`
     });
 
     return { 
@@ -227,9 +227,10 @@ class BroadcastEngine {
         fullMessage = fullMessage.replace(/{first_name}/g, user.firstName || 'বন্ধু');
         fullMessage = fullMessage.replace(/{username}/g, user.username ? `@${user.username}` : '');
 
-        let sendResult: { ok: boolean; error?: string; retryAfter?: number };
+        let sendResult: { ok: boolean; error?: string; retryAfter?: number; isBlocked?: boolean };
 
-        const userMarkup = (settings.requireChannelVerify === false || user.isChannelVerified)
+        const attachButton = payload.includeButtons !== false;
+        const userMarkup = (attachButton && (settings.requireChannelVerify === false || user.isChannelVerified))
           ? verifiedReplyMarkup
           : replyMarkup;
 
@@ -241,7 +242,8 @@ class BroadcastEngine {
               photo: photoToSend,
               caption: fullMessage,
               parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-              reply_markup: userMarkup
+              reply_markup: userMarkup,
+              skipTracking: true
             });
             sendResult = photoRes;
             if (photoRes.ok && photoRes.fileId && !cachedTelegramFileId) {
@@ -252,7 +254,8 @@ class BroadcastEngine {
               chat_id: user.id,
               text: fullMessage,
               parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-              reply_markup: userMarkup
+              reply_markup: userMarkup,
+              skipTracking: true
             });
           }
         } catch (netErr: any) {
@@ -274,7 +277,8 @@ class BroadcastEngine {
                 photo: photoToSend,
                 caption: fullMessage,
                 parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-                reply_markup: userMarkup
+                reply_markup: userMarkup,
+                skipTracking: true
               });
               sendResult = photoRes;
               if (photoRes.ok && photoRes.fileId && !cachedTelegramFileId) {
@@ -285,7 +289,8 @@ class BroadcastEngine {
                 chat_id: user.id,
                 text: fullMessage,
                 parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-                reply_markup: userMarkup
+                reply_markup: userMarkup,
+                skipTracking: true
               });
             }
           } catch (retryErr: any) {
@@ -295,6 +300,7 @@ class BroadcastEngine {
 
         const errStr = (sendResult.error || '').toLowerCase();
         const isBlocked = 
+          Boolean(sendResult.isBlocked) ||
           errStr.includes('blocked') || 
           errStr.includes('deactivated') || 
           errStr.includes('chat not found') ||
@@ -399,7 +405,7 @@ class BroadcastEngine {
 
     const inlineKeyboard: any[] = [];
     const miniAppUrl = (settings.miniAppUrl || 'https://marketify5.markafi189.workers.dev/').trim();
-    if (miniAppUrl.startsWith('http')) {
+    if (payload.includeButtons !== false && miniAppUrl.startsWith('http')) {
       inlineKeyboard.push([
         {
           text: settings.miniAppButtonText || "🚀 ওপেন মিনি অ্যাপ",
@@ -425,14 +431,16 @@ class BroadcastEngine {
         photo: payload.imageUrl!.trim(),
         caption: fullMessage,
         parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-        reply_markup: replyMarkup
+        reply_markup: replyMarkup,
+        skipTracking: true
       });
     } else {
       return await botEngine.sendMessage({
         chat_id: targetChatId,
         text: fullMessage,
         parse_mode: payload.parseMode === 'None' ? undefined : (payload.parseMode || 'HTML'),
-        reply_markup: replyMarkup
+        reply_markup: replyMarkup,
+        skipTracking: true
       });
     }
   }

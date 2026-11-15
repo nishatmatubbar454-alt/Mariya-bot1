@@ -25,6 +25,10 @@ export interface BotUser {
   chatHistory?: ChatMessage[];
   isChannelVerified?: boolean;
   verifiedAt?: string;
+  trackedMessageIds?: number[];
+  referredBy?: number;
+  pendingReferredBy?: number;
+  referralCount?: number;
 }
 
 export interface BotCommandsConfig {
@@ -190,9 +194,13 @@ export interface SystemStatus {
     autoDeleteOnUnverified?: boolean;
     miniAppUrl?: string;
     miniAppButtonText?: string;
+    adminTelegramId?: string;
   };
   stats: {
     totalUsers: number;
+    activeUsers?: number;
+    verifiedUsers?: number;
+    unverifiedUsers?: number;
     activeToday: number;
     totalMessages: number;
     blockedUsers: number;

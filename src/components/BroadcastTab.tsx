@@ -39,11 +39,12 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
   // Form State
   const [title, setTitle] = useState('🔥 নতুন এক্সক্লুসিভ ভিডিও কালেকশন আপডেট!');
   const [message, setMessage] = useState(
-    `হাই {first_name},\n\nআজকের সবথেকে গরম ও আকর্ষণীয় ভিডিওগুলো সরাসরি আমাদের FlickCove চ্যানেলে আপলোড করা হয়েছে! এখনই জয়েন করে ফুল ভিডিও উপভোগ করুন।\n\nআর ব্যাকআপ ভিডিও যাতে মিস না হয় সেজন্য হোয়াটসঅ্যাপ চ্যানেলে যুক্ত থাকুন।`
+    `হাই {first_name},\n\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের নতুন ও আকর্ষণীয় ভিডিও আপলোড করা হয়েছে! এখনই নিচের মিনি ওয়েব বাটনে ক্লিক করে সব ভিডিও দেখে নিন।`
   );
   const [imageUrl, setImageUrl] = useState('');
   const [selectedFileName, setSelectedFileName] = useState('');
   const botUsername = status?.bot?.botInfo?.username || status?.settings?.botUsername || 'mariya_2Bot';
+  const miniAppButtonText = status?.settings?.miniAppButtonText || '🚀 ওপেন মিনি অ্যাপ';
   const [selectedFileSize, setSelectedFileSize] = useState('');
   const [parseMode, setParseMode] = useState<'HTML' | 'Markdown' | 'None'>('HTML');
   const [delaySeconds, setDelaySeconds] = useState<number>(2);
@@ -112,12 +113,22 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
   };
 
   const totalUsers = status?.stats?.totalUsers || 0;
+  const blockedUsers = status?.stats?.blockedUsers || 0;
+  const activeUsers = status?.stats?.activeUsers ?? Math.max(0, totalUsers - blockedUsers);
+  const verifiedUsers = status?.stats?.verifiedUsers ?? 0;
+  const unverifiedUsers = status?.stats?.unverifiedUsers ?? 0;
   const isRunning = progress.status === 'running';
   const isPaused = progress.status === 'paused';
 
   useEffect(() => {
     fetchHistory();
   }, []);
+
+  useEffect(() => {
+    if (!testChatId && status?.settings?.adminTelegramId) {
+      setTestChatId(status.settings.adminTelegramId);
+    }
+  }, [status?.settings?.adminTelegramId]);
 
   const fetchHistory = async () => {
     setLoadingHistory(true);
@@ -138,33 +149,36 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
   };
 
   // Preset templates
-  const applyTemplate = (type: 'video_promo' | 'whatsapp_backup' | 'custom_code') => {
+  const applyTemplate = (type: 'video_promo' | 'miniapp_alert' | 'custom_code') => {
     if (type === 'video_promo') {
       setTitle('🎬 নতুন প্রিমিয়াম ভিডিওগুলো এখনই দেখে নিন!');
-      setMessage(`প্রিয় {first_name},\n\nআমাদের চ্যানেলে চমৎকার সব নতুন ভিডিও আপলোড সম্পন্ন হয়েছে। কোনো প্রকার বিজ্ঞাপন বা ঝামেলা ছাড়াই সরাসরি দেখতে নিচের বাটনে ক্লিক করুন।`);
+      setMessage(`প্রিয় {first_name},\n\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের নতুন ভিডিও আপলোড সম্পন্ন হয়েছে। কোনো ঝামেলা ছাড়াই সরাসরি দেখতে নিচের মিনি ওয়েব বাটনে ক্লিক করুন 👇`);
       setIncludeButtons(true);
-    } else if (type === 'whatsapp_backup') {
-      setTitle('⚠️ জরুরি নোটিশ: ব্যাকআপ চ্যানেলে যুক্ত হন');
-      setMessage(`প্রিয় দর্শক,\n\nটেলিগ্রাম চ্যানেলে কোনো সমস্যা বা কপিরাইট স্ট্রাইক আসলে যাতে ভিডিও মিস না হয়, তার জন্য আমাদের WhatsApp ব্যাকআপ চ্যানেল চালু হয়েছে। এখনই জয়েন করে রাখুন!`);
+    } else if (type === 'miniapp_alert') {
+      setTitle('🚀 মিনি ওয়েবে নতুন ভিডিও আপডেট এসেছে!');
+      setMessage(`প্রিয় {first_name},\n\nআমাদের মিনি ওয়েবের মধ্যে সকল ধরনের বাংলাদেশী ও টিকটকারের ভিডিও পাওয়া যায়। এখনই নিচের বাটনে চাপ দিয়ে সব ভিডিও দেখে নিন!`);
       setIncludeButtons(true);
     } else if (type === 'custom_code') {
-      setTitle('🚀 Special Link Alert');
-      setMessage(`<b>Hello {first_name}!</b>\n\nCheck out the latest video updates:\n👉 <code>HD 1080p Quality Available</code>\n\nJoin the official network now!`);
+      setTitle('🚀 Special Video Alert');
+      setMessage(`<b>Hello {first_name}!</b>\n\nCheck out the latest videos inside our Mini Web:\n👉 <code>HD Quality Available</code>\n\nTap the button below to watch now!`);
       setParseMode('HTML');
       setIncludeButtons(true);
     }
   };
 
   // Start Broadcast
-  const handleStartBroadcast = async (resumeId?: string) => {
-    if (!message.trim()) {
+  const handleStartBroadcast = async (resumeId?: string, override?: { title?: string; message?: string }) => {
+    const finalTitle = (override?.title !== undefined ? override.title : title).trim();
+    const finalMessage = (override?.message !== undefined ? override.message : message).trim();
+
+    if (!finalMessage) {
       setActionError('দয়া করে ব্রডকাস্ট মেসেজ টেক্সট লিখুন।');
       setCurrentStep(1);
       return;
     }
 
-    if (totalUsers === 0) {
-      setActionError('ডাটাবেজে কোনো ইউজার নেই! ইউজাররা বটে /start করলে এখানে যুক্ত হবে।');
+    if (activeUsers === 0) {
+      setActionError('ডাটাবেজে কোনো অ্যাক্টিভ ইউজার নেই! ইউজাররা বটে /start করলে (চ্যানেল জয়েন থাকুক বা না থাকুক) এখানে যুক্ত হবে।');
       return;
     }
 
@@ -176,8 +190,8 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title.trim(),
-          message: message.trim(),
+          title: finalTitle,
+          message: finalMessage,
           imageUrl: imageUrl.trim(),
           parseMode,
           delaySeconds,
@@ -281,7 +295,7 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
     setTimeout(() => setCopiedCmd(false), 2500);
   };
 
-  const estimatedMinutes = Math.ceil(((totalUsers / batchSize) * delaySeconds) / 60);
+  const estimatedMinutes = Math.ceil(((activeUsers / batchSize) * delaySeconds) / 60);
 
   return (
     <div className="space-y-4">
@@ -337,11 +351,13 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
         </div>
 
         {/* Audience summary badge */}
-        <div className="flex items-center gap-2 text-[11px] text-slate-400 px-2 py-1 rounded bg-slate-950/60 border border-slate-800/80">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 px-2.5 py-1 rounded bg-slate-950/60 border border-slate-800/80">
           <Users className="w-3.5 h-3.5 text-cyan-400" />
-          <span>মোট ইউজার: <strong className="text-white font-mono">{totalUsers.toLocaleString()}</strong></span>
+          <span>ব্রডকাস্ট ইউজার: <strong className="text-white font-mono">{activeUsers.toLocaleString()}</strong></span>
           <span className="text-slate-600">•</span>
-          <span>ব্যাচ: <strong className="text-cyan-300">{batchSize} জন</strong></span>
+          <span className="text-emerald-400 font-mono">ভেরিফায়েড: {verifiedUsers.toLocaleString()}</span>
+          <span className="text-slate-600">•</span>
+          <span className="text-amber-300 font-mono">নন-ভেরিফায়েড: {unverifiedUsers.toLocaleString()}</span>
         </div>
       </div>
 
@@ -393,10 +409,10 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
                   </button>
                   <button
                     type="button"
-                    onClick={() => applyTemplate('whatsapp_backup')}
+                    onClick={() => applyTemplate('miniapp_alert')}
                     className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[10px] font-medium"
                   >
-                    WhatsApp ব্যাকআপ
+                    মিনি অ্যাপ অ্যালার্ট
                   </button>
                 </div>
               </div>
@@ -600,17 +616,22 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
                   যেসব ইউজার একবার মেসেজ পেয়েছে তারা একই ক্যাম্পেইনে দ্বিতীয়বার মেসেজ পাবে না।
                 </p>
 
-                <div className="pt-2 border-t border-slate-800/60 flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="incBtn"
-                    checked={includeButtons}
-                    onChange={(e) => setIncludeButtons(e.target.checked)}
-                    className="w-4 h-4 rounded text-cyan-500 bg-slate-900 border-slate-700 cursor-pointer"
-                  />
-                  <label htmlFor="incBtn" className="text-xs font-semibold text-slate-200 cursor-pointer">
-                    FlickCove টেলিগ্রাম ও WhatsApp চ্যানেলের জয়েন বাটন যুক্ত করুন
-                  </label>
+                <div className="pt-2 border-t border-slate-800/60 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="incBtn"
+                      checked={includeButtons}
+                      onChange={(e) => setIncludeButtons(e.target.checked)}
+                      className="w-4 h-4 rounded text-cyan-500 bg-slate-900 border-slate-700 cursor-pointer"
+                    />
+                    <label htmlFor="incBtn" className="text-xs font-semibold text-slate-200 cursor-pointer">
+                      মিনি অ্যাপ বাটন যুক্ত করুন ({miniAppButtonText})
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-emerald-300/90 leading-normal pl-6">
+                    চ্যানেলে জয়েন থাকুক বা না থাকুক — বট <code className="font-mono">/start</code> করা সকল সক্রিয় ইউজারের কাছেই ব্রডকাস্ট মেসেজ পৌঁছাবে (নন-ভেরিফায়েড ইউজাররা শুধু মেসেজ পাবেন, ভেরিফায়েড ইউজাররা নিচে মিনি অ্যাপ বাটন পাবেন)।
+                  </p>
                 </div>
               </div>
 
@@ -726,14 +747,10 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
                 </div>
 
                 {includeButtons && (
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-2">
                     <div className="w-full py-1.5 px-2.5 rounded-lg bg-slate-800 text-cyan-300 text-[11px] font-semibold text-center border border-slate-700 flex items-center justify-center gap-1">
-                      <span>🎬 সব ভিডিও দেখুন (FlickCove)</span>
+                      <span>{miniAppButtonText}</span>
                       <ExternalLink className="w-3 h-3 text-cyan-400" />
-                    </div>
-                    <div className="w-full py-1.5 px-2.5 rounded-lg bg-slate-800 text-emerald-300 text-[11px] font-semibold text-center border border-slate-700 flex items-center justify-center gap-1">
-                      <span>📲 ব্যাকআপ চ্যানেল (WhatsApp)</span>
-                      <ExternalLink className="w-3 h-3 text-emerald-400" />
                     </div>
                   </div>
                 )}
@@ -806,7 +823,7 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
                   className="flex-1 py-2 px-3 rounded-lg bg-gradient-to-r from-cyan-600 via-indigo-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white font-bold text-xs shadow-md shadow-cyan-600/20 transition-all flex items-center justify-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Send করুন ({totalUsers.toLocaleString()} জন)</span>
+                  <span>Send করুন ({activeUsers.toLocaleString()} জন)</span>
                 </button>
               </div>
             </div>
@@ -900,7 +917,7 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
               <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
                 <div className="text-[11px] font-semibold text-slate-400">Total users:</div>
                 <div className="text-lg font-bold text-white font-mono mt-0.5">
-                  {(progress.totalUsers || totalUsers).toLocaleString()}
+                  {(progress.totalUsers || activeUsers).toLocaleString()}
                 </div>
               </div>
 
@@ -1071,7 +1088,7 @@ export const BroadcastTab: React.FC<BroadcastTabProps> = ({ status, onRefreshSta
                       onClick={() => {
                         setTitle(item.title || '');
                         setMessage(item.message || '');
-                        handleStartBroadcast(item.id);
+                        handleStartBroadcast(item.id, { title: item.title || '', message: item.message || '' });
                       }}
                       className="w-full py-1.5 px-2.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors"
                       title="যাদের পাঠানো হয়নি শুধু তাদের পাঠানো হবে"

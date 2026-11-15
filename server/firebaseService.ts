@@ -439,8 +439,11 @@ export async function saveOrUpdateUser(user: Partial<BotUser> & { id: number }):
     trackedMessageIds: user.trackedMessageIds !== undefined ? user.trackedMessageIds : (existing?.trackedMessageIds || [])
   };
 
+  const isNewUser = !existing;
+  const statusChanged = Boolean(existing && existing.status !== updatedUser.status);
+
   store.users[userIdStr] = updatedUser;
-  writeStorage(store);
+  writeStorage(store, isNewUser || statusChanged);
 
   // Background non-blocking sync to Firebase Realtime Database
   syncUserToFirebase(updatedUser).catch(() => {});
@@ -487,6 +490,42 @@ export async function updateUserVerification(userId: number, isVerified: boolean
   }
   writeStorage(store);
   syncUserToFirebase(user).catch(() => {});
+}
+
+export async function recordPendingReferral(userId: number, referrerId: number): Promise<void> {
+  if (!userId || !referrerId || userId === referrerId) return;
+  const store = ensureStorage();
+  const user = store.users[userId.toString()];
+  if (!user) return;
+  if (user.referredBy || user.pendingReferredBy) return;
+  user.pendingReferredBy = referrerId;
+  writeStorage(store);
+  syncUserToFirebase(user).catch(() => {});
+}
+
+export async function finalizeReferralIfPending(userId: number): Promise<{ credited: boolean; referrerId?: number }> {
+  const store = ensureStorage();
+  const user = store.users[userId.toString()];
+  if (!user || !user.pendingReferredBy || user.referredBy) {
+    return { credited: false };
+  }
+  const referrerId = user.pendingReferredBy;
+  if (!referrerId || referrerId === userId) {
+    delete user.pendingReferredBy;
+    writeStorage(store);
+    return { credited: false };
+  }
+  user.referredBy = referrerId;
+  delete user.pendingReferredBy;
+
+  const referrer = store.users[referrerId.toString()];
+  if (referrer) {
+    referrer.referralCount = (referrer.referralCount || 0) + 1;
+    syncUserToFirebase(referrer).catch(() => {});
+  }
+  writeStorage(store);
+  syncUserToFirebase(user).catch(() => {});
+  return { credited: true, referrerId };
 }
 
 export async function clearUserChatHistory(userId: number): Promise<void> {

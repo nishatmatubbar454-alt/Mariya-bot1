@@ -8,6 +8,8 @@ import {
   getTrackedChatMessageIds,
   replaceTrackedChatMessageIds,
   updateUserVerification,
+  recordPendingReferral,
+  finalizeReferralIfPending,
   clearUserChatHistory,
   DEFAULT_COMMANDS,
   DEFAULT_VERIFICATION_CHANNELS,
@@ -18,7 +20,23 @@ import {
 import { generateAiReply } from "./geminiService.js";
 import { BotCommandsConfig, BotSettings, VerificationChannel } from "./types.js";
 
-export type BotCommandType = 'start' | 'video_help' | 'new_video' | 'backup_channel' | null;
+export type BotCommandType = 'start' | 'video_help' | 'new_video' | 'backup_channel' | 'refer' | null;
+
+export function parseReferralCode(raw: string): number | null {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return null;
+  let payload = trimmed;
+  if (trimmed.startsWith('/start')) {
+    payload = trimmed.replace(/^\/start(@[a-zA-Z0-9_]+)?\s*/i, '').trim();
+  }
+  if (!payload) return null;
+  const cleaned = payload.replace(/^(?:ref_|r_)/i, '').trim();
+  if (/^\d{5,15}$/.test(cleaned)) {
+    const id = Number(cleaned);
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+  }
+  return null;
+}
 
 export function detectBotCommand(rawText: string): BotCommandType {
   const t = (rawText || '').trim();
@@ -26,6 +44,7 @@ export function detectBotCommand(rawText: string): BotCommandType {
 
   // 1. Slash commands
   if (t.startsWith('/start')) return 'start';
+  if (t.startsWith('/refer') || t.startsWith('/ref') || t.startsWith('/invite')) return 'refer';
   if (t.startsWith('/video_help') || t.startsWith('/help') || t.startsWith('/watch')) return 'video_help';
   if (t.startsWith('/new_video') || t.startsWith('/latest')) return 'new_video';
   if (t.startsWith('/backup') || t.startsWith('/bickup')) return 'backup_channel';
@@ -110,6 +129,13 @@ interface TelegramUpdate {
     message?: TelegramMessage;
     data?: string;
   };
+  my_chat_member?: {
+    chat: TelegramChat;
+    from: TelegramUser;
+    date: number;
+    old_chat_member?: { status: string };
+    new_chat_member?: { status: string };
+  };
 }
 
 class TelegramBotEngine {
@@ -121,6 +147,48 @@ class TelegramBotEngine {
   private activePollingPromise: Promise<void> | null = null;
   private lastPollSuccess: number = Date.now();
   private watchdogInterval: NodeJS.Timeout | null = null;
+  private latestProtectedMsgByUser: Map<number, number> = new Map();
+
+  private async scheduleDelayedCleanup(
+    chatId: number | string,
+    userId: number,
+    keepMessageId: number,
+    candidateIds: number[],
+    delayMs: number = 1000,
+    modeLabel: string = 'cleanup'
+  ): Promise<void> {
+    if (!keepMessageId || keepMessageId <= 0) return;
+
+    const prevLatest = this.latestProtectedMsgByUser.get(userId) || 0;
+    if (keepMessageId > prevLatest) {
+      this.latestProtectedMsgByUser.set(userId, keepMessageId);
+    }
+
+    await replaceTrackedChatMessageIds(userId, [keepMessageId]);
+
+    const snapshotIds = Array.from(
+      new Set(candidateIds.filter(id => typeof id === 'number' && id > 0 && id < keepMessageId))
+    );
+
+    if (snapshotIds.length === 0) return;
+
+    setTimeout(async () => {
+      try {
+        const latestKept = this.latestProtectedMsgByUser.get(userId) || keepMessageId;
+        const safeIdsToDelete = snapshotIds.filter(id => id < keepMessageId && id < latestKept);
+        if (safeIdsToDelete.length === 0) return;
+
+        const deletedCount = await this.deleteChatMessagesBatch(chatId, safeIdsToDelete);
+        addActivityLog({
+          type: 'system',
+          userId,
+          message: `🧹 [${modeLabel}] User #${userId}: 1s পর পূর্বের ${deletedCount}টি মেসেজ ডিলিট করা হয়েছে।`
+        }).catch(() => {});
+      } catch (err: any) {
+        console.warn('[BotEngine DelayedCleanup] Error:', err?.message || err);
+      }
+    }, delayMs);
+  }
 
   public async getStatus() {
     let webhookInfo: any = null;
@@ -305,7 +373,8 @@ class TelegramBotEngine {
           continue;
         }
 
-        const url = `https://api.telegram.org/bot${settings.botToken}/getUpdates?offset=${this.pollOffset}&timeout=8&limit=100`;
+        const allowedUpdates = encodeURIComponent(JSON.stringify(['message', 'callback_query', 'my_chat_member']));
+        const url = `https://api.telegram.org/bot${settings.botToken}/getUpdates?offset=${this.pollOffset}&timeout=8&limit=100&allowed_updates=${allowedUpdates}`;
 
         // 15-second per-request abort timeout to prevent indefinite socket hanging
         const reqController = new AbortController();
@@ -737,15 +806,16 @@ class TelegramBotEngine {
       // Never delete the newly sent verify message itself
       idsToDelete.delete(newVerifyMsgId);
 
-      const deletedCount = await this.deleteChatMessagesBatch(chatId, Array.from(idsToDelete));
-      await replaceTrackedChatMessageIds(userId, [newVerifyMsgId]);
       await clearUserChatHistory(userId);
-
-      addActivityLog({
-        type: 'system',
+      // 2. Delete ALL previous messages 1 second AFTER sending the verify message
+      await this.scheduleDelayedCleanup(
+        chatId,
         userId,
-        message: `🔒 Unverified user #${userId}: Verify message sent & ${deletedCount} bot messages auto-deleted.`
-      }).catch(() => {});
+        newVerifyMsgId,
+        Array.from(idsToDelete),
+        1000,
+        'unverified'
+      );
     } else if (newVerifyMsgId > 0) {
       await trackChatMessageId(userId, newVerifyMsgId);
     }
@@ -789,10 +859,11 @@ class TelegramBotEngine {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           commands: [
-            { command: 'start', description: '🏠 বট শুরু করুন ও ভিডিও লিংক' },
+            { command: 'start', description: '🏠 বট শুরু করুন ও মিনি অ্যাপ' },
+            { command: 'refer', description: '🔗 আপনার রেফার লিংক পান' },
             { command: 'new_video', description: '🔥 প্রতিদিনের নতুন ভিডিও (/new video)' },
             { command: 'video_help', description: '🔍 ভিডিও দেখার ও খোঁজার উপায়' },
-            { command: 'backup_channel', description: '📲 ব্রেকাপ চ্যানেল (/Bickup channel)' }
+            { command: 'backup_channel', description: '📲 ব্যাকআপ চ্যানেল (/Bickup channel)' }
           ]
         })
       });
@@ -808,6 +879,36 @@ class TelegramBotEngine {
       await this.handleMessage(update.message);
     } else if (update.callback_query) {
       await this.handleCallbackQuery(update.callback_query);
+    } else if (update.my_chat_member) {
+      await this.handleMyChatMember(update.my_chat_member);
+    }
+  }
+
+  private async handleMyChatMember(memberUpdate: NonNullable<TelegramUpdate['my_chat_member']>) {
+    try {
+      if (memberUpdate.chat?.type !== 'private' || !memberUpdate.from || memberUpdate.from.is_bot) return;
+      const newStatus = memberUpdate.new_chat_member?.status;
+      if (newStatus === 'kicked' || newStatus === 'left') {
+        await saveOrUpdateUser({
+          id: memberUpdate.from.id,
+          username: memberUpdate.from.username,
+          firstName: memberUpdate.from.first_name,
+          lastName: memberUpdate.from.last_name,
+          status: 'blocked_bot',
+          messageCount: 0
+        });
+      } else if (newStatus === 'member') {
+        await saveOrUpdateUser({
+          id: memberUpdate.from.id,
+          username: memberUpdate.from.username,
+          firstName: memberUpdate.from.first_name,
+          lastName: memberUpdate.from.last_name,
+          status: 'active',
+          messageCount: 0
+        });
+      }
+    } catch (err: any) {
+      console.warn('[BotEngine] Error handling my_chat_member:', err?.message || err);
     }
   }
 
@@ -835,28 +936,48 @@ class TelegramBotEngine {
           await this.answerCallbackQuery(cb.id, '✅ Verify সফল হয়েছে! এখন আপনি বট ব্যবহার করতে পারবেন।', false);
           await updateUserVerification(userId, true);
 
-          // Remove the verify prompt message cleanly
-          if (cb.message?.message_id) {
-            await this.deleteChatMessage(chatId, cb.message.message_id, settings.botToken);
-          }
-
+          // 1. Send the verification success message FIRST
           const successText = settings.verifySuccessMessage || DEFAULT_VERIFY_SUCCESS;
           const replyMarkup = this.buildReplyMarkup(settings);
           const sent = await this.sendMessage({
             chat_id: chatId,
             text: successText,
             parse_mode: 'HTML',
-            reply_markup: replyMarkup
+            reply_markup: replyMarkup,
+            skipTracking: true
           });
-          if (sent.ok && sent.result?.message_id) {
-            await replaceTrackedChatMessageIds(userId, [sent.result.message_id]);
+
+          const newSuccessMsgId = sent.ok && sent.result?.message_id ? Number(sent.result.message_id) : 0;
+
+          // 2. THEN delete ALL previous messages 3 seconds AFTER sending the verification success message
+          if (newSuccessMsgId > 0) {
+            const trackedIds = await getTrackedChatMessageIds(userId);
+            const idsToDelete = new Set<number>(trackedIds);
+            if (cb.message?.message_id) {
+              idsToDelete.add(cb.message.message_id);
+            }
+            const sweepStart = Math.max(1, newSuccessMsgId - 150);
+            for (let mid = sweepStart; mid < newSuccessMsgId; mid++) {
+              idsToDelete.add(mid);
+            }
+            idsToDelete.delete(newSuccessMsgId);
+
+            await this.scheduleDelayedCleanup(
+              chatId,
+              userId,
+              newSuccessMsgId,
+              Array.from(idsToDelete),
+              1000,
+              'verified'
+            );
+          } else if (cb.message?.message_id) {
+            const promptMsgId = cb.message.message_id;
+            setTimeout(() => {
+              this.deleteChatMessage(chatId, promptMsgId, settings.botToken).catch(() => {});
+            }, 1000);
           }
 
-          addActivityLog({
-            type: 'system',
-            userId,
-            message: `✅ User #${userId} (${cb.from.first_name || 'User'}) passed 24/7 Channel Verification.`
-          }).catch(() => {});
+          await this.processReferralReward(userId, cb.from.first_name, settings).catch(() => {});
           return;
         }
 
@@ -991,6 +1112,14 @@ class TelegramBotEngine {
 
       await trackChatMessageId(userId, msg.message_id);
 
+      // Capture /start referral deep-link payload before channel verification so credit isn't lost
+      if (text.startsWith('/start')) {
+        const refId = parseReferralCode(text);
+        if (refId && refId !== userId) {
+          await recordPendingReferral(userId, refId).catch(() => {});
+        }
+      }
+
       // Admin reply handling: If admin replies to a forwarded message in Telegram, send it back to the original user
       if (adminForwardId && userId === adminForwardId && msg.reply_to_message) {
         const replyTargetUser = msg.reply_to_message.forward_from;
@@ -1033,8 +1162,25 @@ class TelegramBotEngine {
             msg.message_id
           );
           return; // BLOCKED: Do NOT call AI, do NOT run commands, do NOT forward or reply!
-        } else if (!hadVerifiedBefore) {
-          await updateUserVerification(userId, true);
+        } else {
+          if (!hadVerifiedBefore) {
+            await updateUserVerification(userId, true);
+            // If user had a pending verify prompt from earlier and just joined channels, clean up old verify prompt 1s after replying
+            if (existingUser?.isChannelVerified === false) {
+              const oldTracked = await getTrackedChatMessageIds(userId);
+              if (oldTracked.length > 0) {
+                const candidateIds = oldTracked.filter(id => id !== msg.message_id);
+                setTimeout(() => {
+                  const latestKept = Math.max(this.latestProtectedMsgByUser.get(userId) || 0, msg.message_id);
+                  const safeIds = candidateIds.filter(id => id < latestKept);
+                  if (safeIds.length > 0) {
+                    this.deleteChatMessagesBatch(chatId, safeIds).catch(() => {});
+                  }
+                }, 1000);
+              }
+            }
+          }
+          await this.processReferralReward(userId, msg.from.first_name, settings).catch(() => {});
         }
       }
 
@@ -1063,6 +1209,12 @@ class TelegramBotEngine {
         if (detectedCmd === 'start') {
           replyContent = settings.commands?.startReply || DEFAULT_COMMANDS.startReply;
           cmdLog = '/start';
+        } else if (detectedCmd === 'refer') {
+          const botUsername = this.botInfo?.username || settings.botUsername || 'mariya_2Bot';
+          const currentUser = await getUserById(userId);
+          const count = currentUser?.referralCount || 0;
+          replyContent = `🔗 আপনার রেফার লিংক:\nhttps://t.me/${botUsername}?start=ref_${userId}\n\n👥 মোট ভেরিফায়েড রেফার: ${count} জন\nএই লিংকে কেউ Start করলে বটে মেসেজ চলে আসবে।`;
+          cmdLog = '/refer';
         } else if (detectedCmd === 'video_help') {
           replyContent = settings.commands?.videoHelpReply || DEFAULT_COMMANDS.videoHelpReply;
           cmdLog = '/ভিডিও দেখার উপায়';
@@ -1118,6 +1270,73 @@ class TelegramBotEngine {
     } catch (msgErr: any) {
       console.error(`[BotEngine] Error handling message from user ${userId}:`, msgErr?.message || msgErr);
     }
+  }
+
+  private async processReferralReward(
+    userId: number,
+    firstName?: string,
+    settingsInput?: BotSettings
+  ): Promise<void> {
+    const res = await finalizeReferralIfPending(userId);
+    if (!res.credited || !res.referrerId) return;
+
+    const settings = settingsInput || await getSettings();
+    const referrerUser = await getUserById(res.referrerId);
+    const totalRefs = referrerUser?.referralCount || 1;
+    const displayName = firstName || `User #${userId}`;
+
+    await addActivityLog({
+      type: 'system',
+      userId: res.referrerId,
+      message: `🔗 Referral credited: ${displayName} (#${userId}) joined via #${res.referrerId} (Total: ${totalRefs})`
+    }).catch(() => {});
+
+    await this.sendMessage({
+      chat_id: res.referrerId,
+      text: `🎉 নতুন রেফারেল সফল হয়েছে!\n\n👤 ${displayName} আপনার রেফার লিংক থেকে বট ও মিনি অ্যাপে জয়েন করেছে।\n👥 আপনার মোট রেফার: ${totalRefs} জন`,
+      reply_markup: this.buildReplyMarkup(settings)
+    }).catch(() => {});
+  }
+
+  public async handleMiniAppOpened(
+    userId: number,
+    firstName?: string,
+    startParam?: string
+  ): Promise<{ ok: boolean; verified: boolean; messageSent: boolean }> {
+    const settings = await getSettings();
+    if (startParam) {
+      const refId = parseReferralCode(startParam);
+      if (refId && refId !== userId) {
+        await recordPendingReferral(userId, refId).catch(() => {});
+      }
+    }
+
+    if (settings.requireChannelVerify !== false) {
+      const expired = await this.isVerificationExpired(userId, settings);
+      const verifyCheck = await this.verifyUserChannels(userId, settings);
+      if (!verifyCheck.allVerified || expired) {
+        await this.sendChannelVerifyAndCleanup(
+          userId,
+          userId,
+          settings,
+          { ...verifyCheck, allVerified: false }
+        );
+        return { ok: false, verified: false, messageSent: true };
+      }
+    }
+
+    await this.processReferralReward(userId, firstName, settings).catch(() => {});
+    const startMsg = settings.commands?.startReply || DEFAULT_COMMANDS.startReply;
+    const sendRes = await this.sendMessage({
+      chat_id: userId,
+      text: startMsg,
+      reply_markup: this.buildReplyMarkup(settings)
+    });
+
+    if (sendRes.ok) {
+      appendChatMessage(userId, 'bot', startMsg).catch(() => {});
+    }
+    return { ok: true, verified: true, messageSent: Boolean(sendRes.ok) };
   }
 
   public async processPendingMessageRequests(): Promise<{ processed: number; errors: number }> {
@@ -1249,6 +1468,7 @@ class TelegramBotEngine {
     caption?: string;
     parse_mode?: string;
     reply_markup?: any;
+    skipTracking?: boolean;
   }): Promise<{ ok: boolean; result?: any; fileId?: string; error?: string; retryAfter?: number; isBlocked?: boolean }> {
     const settings = await getSettings();
     const token = settings.botToken;
@@ -1299,7 +1519,7 @@ class TelegramBotEngine {
 
       const data = await res.json();
       if (data.ok) {
-        if (data.result?.message_id) {
+        if (!params.skipTracking && data.result?.message_id) {
           const numericId = typeof params.chat_id === 'number' ? params.chat_id : parseInt(String(params.chat_id), 10);
           if (!isNaN(numericId) && numericId > 0) {
             trackChatMessageId(numericId, Number(data.result.message_id)).catch(() => {});
@@ -1337,6 +1557,17 @@ class TelegramBotEngine {
               parse_mode: undefined
             });
           } catch (retryErr) {}
+        }
+
+        // Ultimate fallback without reply_markup if Telegram rejected buttons
+        if (params.reply_markup) {
+          try {
+            return await this.sendPhoto({
+              ...params,
+              parse_mode: undefined,
+              reply_markup: undefined
+            });
+          } catch (finalErr) {}
         }
 
         const retryAfter = data.parameters?.retry_after;

@@ -26,6 +26,9 @@ export interface BotUser {
   isChannelVerified?: boolean;
   verifiedAt?: string;
   trackedMessageIds?: number[];
+  referredBy?: number;
+  pendingReferredBy?: number;
+  referralCount?: number;
 }
 
 export interface BotCommandsConfig {

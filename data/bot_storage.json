@@ -4,23 +4,25 @@
       "firstName": "𝙀𝐫𝐟ᥲ𝗻 𝘼𝗵𝘮𝗲𝙙 🔥",
       "firstSeen": "2026-09-24T08:22:14.917Z",
       "id": 8235864550,
-      "lastActive": "2026-11-07T08:36:50.565Z",
+      "lastActive": "2026-11-14T07:26:24.324Z",
       "lastName": "",
-      "messageCount": 130,
+      "messageCount": 136,
       "status": "active",
-      "username": "erfan13234"
+      "username": "erfan13234",
+      "isChannelVerified": true,
+      "verifiedAt": "2026-11-14T07:17:24.686Z"
     },
     "5569819998": {
       "firstName": "𝗡༏Ꭶ𝓱𝒶т 𝘽𝙪𝙮𝙧 🔕",
       "firstSeen": "2026-11-07T06:41:16.214Z",
       "id": 5569819998,
-      "lastActive": "2026-11-14T07:08:22.844Z",
+      "lastActive": "2026-11-15T08:09:56.535Z",
       "lastName": "",
-      "messageCount": 41,
+      "messageCount": 60,
       "status": "active",
       "username": "Nishat13234",
-      "isChannelVerified": false,
-      "verifiedAt": "2026-11-14T06:59:20.030Z"
+      "isChannelVerified": true,
+      "verifiedAt": "2026-11-15T08:09:57.556Z"
     },
     "8888773188": {
       "firstName": "Sayed",
@@ -31,6 +33,18 @@
       "messageCount": 2,
       "status": "active",
       "username": ""
+    },
+    "8899312335": {
+      "firstName": "Mobarak",
+      "firstSeen": "2026-11-15T06:31:06.375Z",
+      "id": 8899312335,
+      "isChannelVerified": false,
+      "lastActive": "2026-11-15T06:31:06.375Z",
+      "lastName": "Bhuiyan",
+      "messageCount": 1,
+      "status": "active",
+      "username": "",
+      "verifiedAt": ""
     }
   },
   "settings": {
@@ -87,8 +101,56 @@
   "requests": {},
   "logs": [
     {
-      "id": "log-1794640267881-qjigv",
-      "timestamp": "2026-11-14T07:11:07.881Z",
+      "id": "log-1794730806685-8bu7x",
+      "timestamp": "2026-11-15T08:20:06.685Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794642770929-zun2g",
+      "timestamp": "2026-11-14T07:52:50.929Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794642617430-6rrwu",
+      "timestamp": "2026-11-14T07:50:17.431Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794641819639-eke7m",
+      "timestamp": "2026-11-14T07:36:59.639Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794641777894-t15l4",
+      "timestamp": "2026-11-14T07:36:17.894Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794641457389-097s2",
+      "timestamp": "2026-11-14T07:30:57.389Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794641431781-iumz5",
+      "timestamp": "2026-11-14T07:30:31.781Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794640832123-54r32",
+      "timestamp": "2026-11-14T07:20:32.123Z",
+      "type": "system",
+      "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
+    },
+    {
+      "id": "log-1794640765742-qf4l7",
+      "timestamp": "2026-11-14T07:19:25.742Z",
       "type": "system",
       "message": "Telegram Bot @mariya_2Bot started 24/7 polling."
     },

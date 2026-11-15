@@ -73,6 +73,9 @@ app.get('/api/status', async (_req, res) => {
     const todayStr = new Date().toISOString().slice(0, 10);
     const activeToday = users.filter((u) => u.lastActive && u.lastActive.startsWith(todayStr)).length;
     const totalMessages = users.reduce((acc, u) => acc + (u.messageCount || 0), 0);
+    const activeUsersList = users.filter((u) => u.status !== 'blocked_bot');
+    const verifiedUsers = activeUsersList.filter((u) => Boolean(u.isChannelVerified)).length;
+    const unverifiedUsers = activeUsersList.length - verifiedUsers;
 
     res.json({
       success: true,
@@ -89,10 +92,14 @@ app.get('/api/status', async (_req, res) => {
         verificationChannels: settings.verificationChannels || [],
         autoDeleteOnUnverified: settings.autoDeleteOnUnverified !== false,
         miniAppUrl: settings.miniAppUrl || '',
-        miniAppButtonText: settings.miniAppButtonText || '🚀 ওপেন মিনি অ্যাপ'
+        miniAppButtonText: settings.miniAppButtonText || '🚀 ওপেন মিনি অ্যাপ',
+        adminTelegramId: settings.adminTelegramId || ''
       },
       stats: {
         totalUsers: users.length,
+        activeUsers: activeUsersList.length,
+        verifiedUsers,
+        unverifiedUsers,
         activeToday,
         totalMessages,
         blockedUsers: users.filter((u) => u.status === 'blocked_bot').length
@@ -356,6 +363,55 @@ app.use('/api/bot/verify-user', (req, res, next) => {
 });
 app.get('/api/bot/verify-user', handleVerifyUserGate);
 app.post('/api/bot/verify-user', handleVerifyUserGate);
+
+app.use('/api/bot/miniapp-opened', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+app.post('/api/bot/miniapp-opened', async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const initData = String(req.body?.initData || '').trim();
+    const startParam = String(req.body?.startParam || '').trim();
+    let userId = Number(req.body?.userId || 0);
+    let firstName = String(req.body?.firstName || '').trim();
+
+    if (initData && settings.botToken) {
+      const params = new URLSearchParams(initData);
+      const hash = params.get('hash') || '';
+      params.delete('hash');
+      const dataCheckString = Array.from(params.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => `${k}=${v}`)
+        .join('\n');
+      const secretKey = crypto.createHmac('sha256', 'WebAppData').update(settings.botToken).digest();
+      const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+      if (calculatedHash !== hash) {
+        return res.status(403).json({ success: false, error: 'Invalid Telegram initData' });
+      }
+      const userJson = params.get('user');
+      if (userJson) {
+        const parsed = JSON.parse(userJson);
+        if (parsed?.id) userId = Number(parsed.id);
+        if (parsed?.first_name) firstName = String(parsed.first_name);
+      }
+    }
+
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ success: false, error: 'userId or valid initData is required' });
+    }
+
+    const result = await botEngine.handleMiniAppOpened(userId, firstName || undefined, startParam || undefined);
+    return res.status(result.verified ? 200 : 403).json({ success: result.ok, ...result });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 
 // 5. Settings CRUD (Protected & Masked - Zero Leakage)
